@@ -1,0 +1,29 @@
+{# hints panel; expects ch, hints_shown, worth, solved. Hints open in order; each lowers the challenge's value. #}
+<section id="hints" class="rounded-lg border border-slate-800 bg-slate-900 p-4" data-hints{% if hints_oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <h2 class="text-sm font-semibold text-slate-300">Hints</h2>
+  <p class="mb-2 text-xs text-slate-500">
+    {% if solved %}Solved: hints are free now.{% else %}Each hint lowers what this challenge is worth to your team. Open them in order.{% endif %}
+  </p>
+  <div class="space-y-2">
+    {% for hint in ch.hints %}
+      {% set n = loop.index0 %}
+      {% if n in hints_shown %}
+      <p class="rounded-md bg-amber-950/40 px-3 py-2 text-sm text-amber-100" data-hint="{{ n }}">💡 {{ hint }}</p>
+      {% elif n == 0 or (n - 1) in hints_shown %}
+      {% set cost = 0 if solved else ch.hint_cost(n) %}
+      <button hx-post="/c/{{ ch.id }}/hint/{{ n }}" hx-target="#hints" hx-swap="outerHTML"
+              {% if cost %}hx-confirm="Hint {{ n + 1 }} costs {{ cost }} points on this challenge ({{ worth }} → {{ worth - cost }} pts). Show it?"{% endif %}
+              data-hint-button="{{ n }}"
+              class="flex w-full items-center justify-between rounded-md border border-slate-700 px-3 py-1.5 text-left text-sm text-slate-300 hover:border-amber-600 hover:text-amber-200">
+        <span>💡 Show hint {{ n + 1 }}</span>
+        <span class="text-xs {% if cost %}text-rose-300{% else %}text-slate-500{% endif %}" data-hint-cost="{{ cost }}">{% if cost %}−{{ cost }} pts{% else %}free{% endif %}</span>
+      </button>
+      {% else %}
+      <p class="flex w-full items-center justify-between rounded-md border border-dashed border-slate-800 px-3 py-1.5 text-sm text-slate-600" data-hint-locked="{{ n }}">
+        <span>🔒 Hint {{ n + 1 }}</span><span class="text-xs">open hint {{ n }} first</span>
+      </p>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% if oob %}{% include "_worth.html" %}{% endif %}

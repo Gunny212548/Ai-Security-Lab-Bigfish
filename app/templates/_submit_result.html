@@ -1,0 +1,20 @@
+{# expects: ch, result in {correct, already, wrong, empty}; awarded + score when correct #}
+{% if result == "correct" %}
+<p class="text-emerald-300" data-result="correct">✅ Correct! +{{ awarded }} pts{% if awarded < ch.points %} <span class="text-slate-400">(of {{ ch.points }}, after hints)</span>{% endif %}</p>
+{% set hints_oob = true %}{% include "_hints.html" %}
+{% set oob = true %}{% include "_worth.html" %}
+<div id="lesson" hx-swap-oob="innerHTML">{% include "_lesson.html" %}</div>
+<span id="solved-badge" hx-swap-oob="innerHTML">{% include "_solved_badge.html" %}</span>
+<span id="score" hx-swap-oob="innerHTML">{{ score }} pts</span>
+{% elif result == "already" %}
+<p class="text-emerald-300" data-result="already">✅ Correct, and your team already solved this one.</p>
+{% elif result == "canary" %}
+<div class="rounded-md border border-rose-600 bg-rose-950/50 px-3 py-2" data-result="canary">
+  <p class="text-base font-semibold text-rose-200">🤖 ฮั่นแน่ ใช้ AI หรอ</p>
+  <p class="mt-1 text-xs text-rose-200/80">That flag only exists for AI agents. The organizers can see this submission.</p>
+</div>
+{% elif result == "wrong" %}
+<p class="text-rose-300" data-result="wrong">❌ That's not the flag. Keep trying!</p>
+{% else %}
+<p class="text-slate-400" data-result="empty">Paste a flag first.</p>
+{% endif %}

@@ -1,0 +1,12 @@
+{# Loading indicator with the global queue count. expects: thinking_id, thinking_label, thinking_tag (p|span) #}
+<{{ thinking_tag }} id="{{ thinking_id }}" class="htmx-indicator items-center gap-2 text-xs text-slate-400" role="status">
+  <span class="inline-flex items-center gap-0.5" aria-hidden="true">
+    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-400"></span>
+    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-400 [animation-delay:150ms]"></span>
+    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-400 [animation-delay:300ms]"></span>
+  </span>
+  {{ thinking_label }}
+  {# filled by ndQueuePoll() in base.html while this indicator is visible (no hx-* here: a poll inside the
+     hx-post chat form would inherit its hx-target and wipe the chat log) #}
+  <span class="text-slate-500" data-queue></span>
+</{{ thinking_tag }}>

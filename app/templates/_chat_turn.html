@@ -1,0 +1,39 @@
+{# one chat round: appended to #chat-log; X-Ray swapped out-of-band #}
+{% set role, text = "user", user_text %}{% include "_bubble.html" %}
+
+{% if out.blocked %}
+  {% set role, text = "blocked", out.reply %}{% include "_bubble.html" %}
+{% elif out.error %}
+  {% set role, text = "error", out.reply %}{% include "_bubble.html" %}
+{% else %}
+  {% if out.tool_trace %}
+  <div class="ml-10 space-y-1" data-tool-calls>
+    {% for e in out.tool_trace %}
+    <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">BigfishDesk used
+      <code class="rounded border border-violet-500/40 bg-violet-950/40 px-1.5 py-0.5 font-mono text-violet-200">🔧 {{ e.name }}({{ e.raw_args or e.args | tojson }})</code></p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% set role, text = ("redacted" if out.redacted else "assistant"), out.reply %}{% include "_bubble.html" %}
+{% endif %}
+
+{% if out.won %}
+<div class="rounded-lg border border-emerald-600 bg-emerald-950/50 p-3 text-sm" data-impact>
+  {% if out.flag %}
+  <p class="font-semibold text-emerald-200">🎉 Flag unlocked!</p>
+  <p class="mt-1">Submit this flag to score:
+    <code class="select-all rounded bg-slate-950 px-1.5 py-0.5 text-emerald-300" data-flag>{{ out.flag }}</code></p>
+  {% else %}
+  <p class="font-semibold text-emerald-200">🎯 Impact detected!</p>
+  <p class="mt-1 text-emerald-100/80">You made BigfishDesk do something it shouldn't. Find the flag in what it returned, then submit it.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div id="xray" hx-swap-oob="innerHTML">
+  {% if out.blocked %}
+  <p class="text-amber-300">🚫 Blocked by the input filter. Nothing was sent to the AI.</p>
+  {% else %}
+  {% set items = out.xray %}{% include "_xray.html" %}
+  {% endif %}
+</div>

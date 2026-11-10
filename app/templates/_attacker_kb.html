@@ -1,0 +1,30 @@
+{# I1: every KB article is editable by anyone. expects ch, kb, notice, error #}
+<div id="attacker" class="space-y-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+    <span>Spaces › <span class="text-slate-300">IT Help</span> › How-to</span>
+    <span class="rounded bg-slate-800 px-1.5 py-0.5">✏️ Anyone at Bigfish can edit</span>
+  </div>
+  {% include "_attacker_status.html" %}
+  {% for a in kb %}
+  <form hx-post="/c/{{ ch.id }}/kb" hx-target="#attacker" hx-swap="outerHTML"
+        class="rounded-md border border-slate-800 bg-slate-950/40" data-kb-article="{{ a.article_id }}">
+    <input type="hidden" name="article_id" value="{{ a.article_id }}">
+    <div class="flex items-start justify-between gap-2 border-b border-slate-800 px-3 py-2">
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-slate-100">📄 {{ a.title }}</p>
+        <p class="text-[11px] text-slate-500">IT Help · visible to all staff</p>
+      </div>
+      <span class="shrink-0 font-mono text-[11px] text-slate-500">{{ a.article_id }}</span>
+    </div>
+    <div class="p-3">
+      <label class="sr-only" for="kb-{{ a.article_id }}">Article text</label>
+      <textarea id="kb-{{ a.article_id }}" name="body" rows="3" maxlength="2000"
+                class="w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 py-2 text-sm leading-relaxed focus:border-rose-500 focus:outline-none">{{ a.body }}</textarea>
+      <div class="mt-2 flex items-center justify-between gap-2">
+        <span class="text-[11px] text-slate-500">Changes go live immediately</span>
+        <button class="rounded-md bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-100 hover:bg-slate-700">Save page</button>
+      </div>
+    </div>
+  </form>
+  {% endfor %}
+</div>

@@ -1,0 +1,3 @@
+{# rate-limited message: shown, not sent, not persisted #}
+{% set role, text = "user", user_text %}{% include "_bubble.html" %}
+{% set role, text = "notice", notice %}{% include "_bubble.html" %}

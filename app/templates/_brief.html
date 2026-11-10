@@ -1,0 +1,29 @@
+{# left column shared by direct + indirect pages; expects ch, hints_shown, worth, solved #}
+  {# --- left: brief, hints, submit ------------------------------------------------- #}
+  <aside class="space-y-4 lg:col-span-3">
+    <section class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm leading-relaxed text-slate-300">
+      {{ ch.story | md }}
+      <p class="mt-3 rounded-md bg-brand-950/50 px-3 py-2 text-brand-100"><strong>🎯 Objective:</strong> {{ ch.objective | md_inline }}</p>
+    </section>
+
+    {% include "_hints.html" %}
+
+    <section class="rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <h2 class="mb-2 text-sm font-semibold text-slate-300">Submit flag</h2>
+      <form hx-post="/c/{{ ch.id }}/submit" hx-target="#submit-result" class="flex gap-2">
+        <input name="flag" placeholder="bigfish{...}" maxlength="200" autocomplete="off" required
+               class="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 font-mono text-sm focus:border-brand-500 focus:outline-none">
+        <button class="rounded-md bg-brand-600 text-white px-3 py-1.5 text-sm font-semibold hover:bg-brand-500">Submit</button>
+      </form>
+      <div id="submit-result" class="mt-2 text-sm" aria-live="polite"></div>
+    </section>
+
+    <div id="lesson">{% if solved %}{% include "_lesson.html" %}{% endif %}</div>
+
+    {% if ch.track == "direct" %}
+    <form method="post" action="/c/{{ ch.id }}/new-chat">
+      <button class="text-sm text-slate-400 hover:text-slate-50" data-new-chat
+              title="Starts a fresh conversation with BigfishDesk for your whole team. Score and hints are kept.">🗨 New chat</button>
+    </form>
+    {% endif %}
+  </aside>

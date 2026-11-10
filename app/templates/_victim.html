@@ -1,0 +1,88 @@
+{# victim POV. expects ch, victim {reply, won, flag, status}, upload (I3, optional) #}
+{% import "_ui.html" as ui %}
+{% set role, text = "user", ch.victim.prompt %}{% include "_bubble.html" %}
+
+{% if victim.status == "ok" %}
+  {% set pretty = victim.reply | pretty_json %}
+  {% if pretty %}
+  {# The AI's JSON is consumed by the system, so show what the system did with it (I2: the queue, I3: the
+     decision), plus the raw JSON for learning (LLM05: nothing checks it). #}
+  {% set data = victim.reply | parse_json %}
+  {% set tickets = data.tickets if data is mapping and data.tickets is sequence and data.tickets is not string else none %}
+  <div class="flex items-start gap-2" data-bubble="assistant-json">
+    {{ ui.avatar("", bot=true) }}
+    <div class="min-w-0 flex-1 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/60">
+      {% if tickets %}
+      <p class="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 text-xs">
+        <strong class="text-slate-200">Queue after AI Triage</strong>
+        <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">applied automatically</span></p>
+      {% set badge = {"P1": "bg-rose-500/20 text-rose-200", "P2": "bg-orange-500/20 text-orange-200",
+                      "P3": "bg-amber-500/20 text-amber-200"} %}
+      <ol class="divide-y divide-slate-800 text-sm" data-triage>
+        {% for t in tickets if t is mapping %}
+        {% set mine = t.ticket_id == "T-PLAYER" %}
+        <li class="flex items-start gap-2.5 px-3 py-2 {{ 'bg-rose-950/30' if mine }}">
+          <span class="w-4 shrink-0 pt-0.5 text-right text-xs text-slate-500">{{ loop.index }}</span>
+          <span class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold {{ badge.get(t.priority | string, 'bg-slate-800 text-slate-300') }}">{{ t.priority or "?" }}</span>
+          <div class="min-w-0">
+            <p class="font-mono text-xs {{ 'text-rose-300' if mine else 'text-slate-400' }}">{{ t.ticket_id }}{% if mine %} <span class="font-sans">(yours)</span>{% endif %}</p>
+            <p class="text-xs text-slate-300">{{ t.reason }}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      {% elif data is mapping and "approved" in data %}
+      <div class="flex items-start gap-3 px-3 py-3" data-decision>
+        {% if data.approved is sameas true %}
+        <span class="shrink-0 whitespace-nowrap rounded-md bg-emerald-500/20 px-2 py-1 text-sm font-bold text-emerald-200">✅ Approved</span>
+        {% else %}
+        <span class="shrink-0 whitespace-nowrap rounded-md bg-rose-500/20 px-2 py-1 text-sm font-bold text-rose-200">❌ Rejected</span>
+        {% endif %}
+        <div class="min-w-0 text-xs">
+          <p class="text-slate-400">AI reviewer · Local Admin rights for Somchai</p>
+          <p class="mt-0.5 text-slate-200">{{ data.reason }}</p>
+        </div>
+      </div>
+      {% else %}
+      <p class="border-b border-slate-800 px-3 py-2 text-xs"><strong class="text-slate-200">AI result</strong></p>
+      {% endif %}
+      <details class="border-t border-slate-800" {{ "open" if not (tickets or (data is mapping and "approved" in data)) }}>
+        <summary class="cursor-pointer select-none px-3 py-1.5 text-[11px] text-slate-500">View raw JSON · BigfishDesk returned JSON:</summary>
+        <pre class="whitespace-pre-wrap break-words px-3 pb-2 font-mono text-xs leading-relaxed">{{ pretty }}</pre>
+      </details>
+    </div>
+  </div>
+  {% else %}
+  {% set role, text = "assistant", victim.reply %}{% include "_bubble.html" %}
+  {% endif %}
+{% elif victim.status == "rejected" %}
+  <p class="rounded-md border border-rose-700 bg-rose-950/50 px-3 py-2 text-sm text-rose-200" data-rejected>{{ victim.reply }}</p>
+{% else %}
+  {% set role, text = "notice", victim.reply %}{% include "_bubble.html" %}
+{% endif %}
+
+{% if victim.won %}
+<div class="rounded-lg border border-emerald-600 bg-emerald-950/50 p-3 text-sm" data-impact>
+  {% if victim.flag %}
+  <p class="font-semibold text-emerald-200">🎉 Flag unlocked!</p>
+  <p class="mt-1">Submit this flag to score:
+    <code class="select-all rounded bg-slate-950 px-1.5 py-0.5 text-emerald-300" data-flag>{{ victim.flag }}</code></p>
+  {% else %}
+  <p class="font-semibold text-emerald-200">🎯 Impact detected!</p>
+  <p class="mt-1 text-emerald-100/80">The employee's AI did what you wanted. Find the flag, then submit it.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if upload %}
+<div class="grid gap-2 sm:grid-cols-2" data-pdf-previews>
+  <div class="rounded-md border border-slate-700 bg-white p-2 text-[#0f172a]">
+    <p class="mb-1 text-xs font-semibold text-[#64748b]">👁 What IT Staff sees</p>
+    <pre class="whitespace-pre-wrap break-words font-sans text-xs" data-human-text>{{ upload.human_text or "(empty page)" }}</pre>
+  </div>
+  <div class="rounded-md border border-rose-700 bg-rose-950/30 p-2">
+    <p class="mb-1 text-xs font-semibold text-rose-300">🤖 What the AI sees</p>
+    <pre class="whitespace-pre-wrap break-words text-xs text-slate-200" data-ai-text>{{ upload.ai_text or "(no text)" }}</pre>
+  </div>
+</div>
+{% endif %}

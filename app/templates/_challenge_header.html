@@ -1,0 +1,8 @@
+<div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+  <a href="/board" class="text-sm text-slate-400 hover:text-slate-50">← Challenges</a>
+  <span class="font-mono text-xs uppercase text-slate-500">{{ ch.id }}</span>
+  <h1 class="text-xl font-semibold">{{ ch.title }}</h1>
+  {% include "_worth.html" %}
+  <span class="text-sm" aria-label="Difficulty {{ ch.difficulty }}">{{ "⭐" * ch.difficulty }}</span>
+  <span id="solved-badge">{% if solved %}{% include "_solved_badge.html" %}{% endif %}</span>
+</div>

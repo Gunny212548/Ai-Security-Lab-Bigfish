@@ -1,0 +1,39 @@
+{# expects: rows (scoreboard.Standing), columns (public cards), first {cid: team_id}, me (team id or None), refresh_s #}
+<div id="scoreboard" hx-get="/scoreboard/table" hx-trigger="every {{ refresh_s }}s" hx-swap="outerHTML"
+     class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+  {% if not rows %}
+  <p class="p-6 text-center text-slate-400" data-empty>No teams yet. Create one on the <a href="/" class="text-brand-300 underline">join page</a>.</p>
+  {% else %}
+  <table class="w-full min-w-[36rem] text-sm">
+    <thead class="border-b border-slate-800 text-left text-xs uppercase text-slate-400">
+      <tr>
+        <th class="px-3 py-2 w-12">#</th>
+        <th class="px-3 py-2">Team</th>
+        {% for c in columns %}
+        <th class="px-2 py-2 text-center font-mono" title="{{ c.title }} · {{ c.points }} pts">{{ c.id }}</th>
+        {% endfor %}
+        <th class="px-3 py-2 text-right">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-team-row="{{ r.team.name }}"
+          class="border-b border-slate-800/60 last:border-0 {% if r.team.id == me %}bg-brand-950/50{% endif %}">
+        <td class="px-3 py-2 font-semibold {% if r.rank == 1 and r.score %}text-amber-300{% else %}text-slate-400{% endif %}">
+          {% if r.score and r.rank <= 3 %}{{ ["🥇", "🥈", "🥉"][r.rank - 1] }}{% else %}{{ r.rank }}{% endif %}</td>
+        <td class="px-3 py-2 font-medium">{{ r.team.name }}{% if r.team.id == me %} <span class="text-xs text-brand-300">(you)</span>{% endif %}</td>
+        {% for c in columns %}
+        {% set s = r.solves.get(c.id) %}
+        <td class="px-2 py-2 text-center" data-cell="{{ c.id }}">
+          {% if s %}
+          {% if first.get(c.id) == r.team.id %}<span title="First blood" data-first-blood>🩸</span>{% else %}<span title="Solved">✅</span>{% endif %}
+          {% else %}<span class="text-slate-700">·</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td class="px-3 py-2 text-right font-semibold text-brand-300" data-score-cell>{{ r.score }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>

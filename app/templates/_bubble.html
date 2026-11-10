@@ -1,0 +1,30 @@
+{# expects: role in {user, assistant, blocked, notice, error, redacted}, text;
+   optional: ch (for the signed-in user's name), when (datetime; omitted = "now", filled in by base.html) #}
+{% import "_ui.html" as ui %}
+{% set me = ch.current_user if ch is defined and ch else "somchai" %}
+{% set stamp %}<time data-local="short" datetime="{{ when | iso if when is defined and when else '' }}"></time>{% endset %}
+{% if role == "user" %}
+<div class="flex items-end justify-end gap-2" data-bubble="user">
+  <div class="flex max-w-[80%] flex-col items-end">
+    <p class="mb-0.5 px-1 text-[11px] text-slate-500">{{ ui.person(me) }} · {{ stamp }}</p>
+    <div class="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 text-sm text-white">{{ text }}</div>
+  </div>
+  {{ ui.avatar(me) }}
+</div>
+{% elif role in ("assistant", "redacted") %}
+<div class="flex items-end gap-2" data-bubble="{{ role }}">
+  {{ ui.avatar("", bot=true) }}
+  <div class="flex min-w-0 max-w-[85%] flex-col items-start">
+    <p class="mb-0.5 px-1 text-[11px] text-slate-500"><span class="font-semibold text-slate-300">BigfishDesk</span> · AI assistant · {{ stamp }}</p>
+    {% if role == "assistant" %}
+    <div class="break-words rounded-2xl rounded-bl-md bg-slate-800 px-3.5 py-2 text-sm leading-relaxed">{{ text | md }}</div>
+    {% else %}
+    <div class="rounded-2xl rounded-bl-md border border-rose-700 bg-rose-950/50 px-3.5 py-2 text-sm text-rose-200">{{ text }}</div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="flex justify-center" data-bubble="{{ role }}">
+  <div class="rounded-full border border-amber-700/70 bg-amber-950/40 px-3 py-1 text-xs text-amber-200">{{ text }}</div>
+</div>
+{% endif %}

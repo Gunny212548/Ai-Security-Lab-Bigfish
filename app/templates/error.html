@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ status }} · Bigfish AI Security Training{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md py-12 text-center" data-error-page="{{ status }}">
+  <p class="font-mono text-5xl font-semibold text-slate-600">{{ status }}</p>
+  <p class="mt-4 text-lg text-slate-200">{{ message }}</p>
+  <div class="mt-6 flex justify-center gap-3 text-sm">
+    <a href="/board" class="rounded-md bg-brand-600 text-white px-4 py-2 font-semibold hover:bg-brand-500">Back to challenges</a>
+    <a href="/" class="rounded-md border border-slate-700 px-4 py-2 hover:bg-slate-800">Join page</a>
+  </div>
+</div>
+{% endblock %}

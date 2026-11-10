@@ -1,0 +1,7 @@
+{# response to ▶ run-victim: replaces #victim, X-Ray swapped out-of-band #}
+{% include "_victim.html" %}
+<span id="run-notice" hx-swap-oob="innerHTML"></span>
+<div id="xray" hx-swap-oob="innerHTML">
+  {% if xray_items %}{% set items = xray_items %}{% include "_xray.html" %}
+  {% else %}<p class="text-slate-500">The AI was not called on this run.</p>{% endif %}
+</div>

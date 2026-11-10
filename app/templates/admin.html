@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Admin · Bigfish AI Security Training{% endblock %}
+{% block nav_extra %}
+<form method="post" action="/admin/logout"><button class="text-slate-400 hover:text-slate-50">Log out admin</button></form>
+{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+  <h1 class="text-2xl font-semibold">🔧 Organizer console</h1>
+  <a href="/admin" class="text-sm text-brand-300 hover:underline">↻ Refresh</a>
+</div>
+
+{% for w in warnings %}
+<p class="mb-2 rounded-md border border-amber-700 bg-amber-950/40 px-4 py-2 text-sm text-amber-200" data-warning>⚠️ {{ w }}</p>
+{% endfor %}
+{% if notice %}<p class="mb-2 rounded-md border border-emerald-700 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-200" data-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p class="mb-2 rounded-md border border-rose-700 bg-rose-950/50 px-4 py-2 text-sm text-rose-200" role="alert" data-error>{{ error }}</p>{% endif %}
+
+{# --- controls ------------------------------------------------------------------- #}
+<section class="mb-6 grid gap-3 md:grid-cols-2">
+  <div class="rounded-lg border border-slate-800 bg-slate-900 p-4" data-indirect-state="{{ 'unlocked' if unlocked else 'locked' }}">
+    <h2 class="font-semibold">🕵️ Indirect track</h2>
+    <p class="mt-1 text-sm text-slate-400">Currently
+      {% if unlocked %}<strong class="text-emerald-300">unlocked</strong>{% else %}<strong class="text-amber-300">🔒 locked</strong>{% endif %}.
+      Unlock it when you reach the Indirect part of the workshop.</p>
+    <form method="post" action="/admin/indirect" class="mt-3">
+      <input type="hidden" name="unlock" value="{{ '0' if unlocked else '1' }}">
+      <button class="rounded-md px-4 py-2 font-semibold {% if unlocked %}border border-slate-600 hover:bg-slate-800{% else %}bg-brand-600 text-white hover:bg-brand-500{% endif %}">
+        {% if unlocked %}🔒 Lock Indirect{% else %}🔓 Unlock Indirect{% endif %}</button>
+    </form>
+  </div>
+  <div class="rounded-lg border border-rose-900 bg-slate-900 p-4">
+    <h2 class="font-semibold text-rose-200">🧨 Reset all</h2>
+    <p class="mt-1 text-sm text-slate-400">Deletes <strong>every team</strong>, solve, submission, chat and upload, and locks Indirect.
+      Players must create new teams. This cannot be undone.</p>
+    <form method="post" action="/admin/reset-all" class="mt-3 flex flex-wrap gap-2">
+      <label class="sr-only" for="confirm">Type {{ confirm_word }} to confirm</label>
+      <input id="confirm" name="confirm" placeholder="Type {{ confirm_word }}" autocomplete="off"
+             class="w-40 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 font-mono focus:border-rose-500 focus:outline-none">
+      <button class="rounded-md bg-rose-600 text-white px-4 py-2 font-semibold hover:bg-rose-500">Reset everything</button>
+    </form>
+  </div>
+</section>
+
+{# --- challenges ------------------------------------------------------------------ #}
+<section class="mb-6">
+  <h2 class="mb-2 text-lg font-semibold">Challenges</h2>
+  <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+    <table class="w-full min-w-[36rem] text-sm">
+      <thead class="border-b border-slate-800 text-left text-xs uppercase text-slate-400">
+        <tr><th class="px-3 py-2">Challenge</th><th class="px-3 py-2 text-right">Pts</th><th class="px-3 py-2 text-right">Solves</th>
+          <th class="px-3 py-2 text-right">Wrong</th><th class="px-3 py-2 text-right">Hints</th><th class="px-3 py-2">🩸 First blood</th></tr>
+      </thead>
+      <tbody>
+        {% for c in challenges %}
+        <tr class="border-b border-slate-800/60 last:border-0" data-stats="{{ c.card.id }}">
+          <td class="px-3 py-2"><span class="font-mono text-xs uppercase text-slate-500">{{ c.card.id }}</span> {{ c.card.title }}
+            <span class="ml-1 font-mono text-[11px] text-slate-500">{% for code, _ in c.card.owasp %}{{ code }}{% if not loop.last %} {% endif %}{% endfor %}</span></td>
+          <td class="px-3 py-2 text-right">{{ c.card.points }}</td>
+          <td class="px-3 py-2 text-right" data-solves>{{ c.stats.solves }}</td>
+          <td class="px-3 py-2 text-right">{{ c.stats.wrong }}</td>
+          <td class="px-3 py-2 text-right">{{ c.stats.hints }}</td>
+          <td class="px-3 py-2">{% if c.first %}{{ c.first[0] }} <time data-local datetime="{{ c.first[1] | iso }}" class="text-xs text-slate-500">{{ c.first[1] | iso }}</time>{% else %}<span class="text-slate-600">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# --- OWASP coverage ------------------------------------------------------------------- #}
+<section class="mb-6">
+  <h2 class="mb-2 text-lg font-semibold">OWASP Top 10 for LLM 2025: coverage</h2>
+  <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+    <table class="w-full min-w-[30rem] text-sm">
+      <tbody>
+        {% for code, name, ids in owasp %}
+        <tr class="border-b border-slate-800/60 last:border-0" data-owasp-row="{{ code }}">
+          <td class="w-20 px-3 py-1.5 font-mono text-xs text-slate-400">{{ code }}</td>
+          <td class="px-3 py-1.5">{{ name }}</td>
+          <td class="px-3 py-1.5 font-mono text-xs uppercase {% if ids %}text-brand-300{% else %}text-rose-300{% endif %}">
+            {% if ids %}{{ ids | join(", ") }}{% else %}not covered{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# --- teams ----------------------------------------------------------------------- #}
+<section class="mb-6">
+  <h2 class="mb-2 text-lg font-semibold">Teams <span class="text-sm font-normal text-slate-400">({{ rows | length }})</span></h2>
+  {% if not rows %}
+  <p class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-slate-400">No teams yet.</p>
+  {% else %}
+  <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+    <table class="w-full min-w-[40rem] text-sm">
+      <thead class="border-b border-slate-800 text-left text-xs uppercase text-slate-400">
+        <tr><th class="px-3 py-2">#</th><th class="px-3 py-2">Team</th><th class="px-3 py-2">Join code</th>
+          {% for c in columns %}<th class="px-2 py-2 text-center font-mono">{{ c.id }}</th>{% endfor %}
+          <th class="px-3 py-2 text-right">Score</th><th class="px-3 py-2">Created</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-b border-slate-800/60 last:border-0" data-admin-team="{{ r.team.name }}">
+          <td class="px-3 py-2 text-slate-400">{{ r.rank }}</td>
+          <td class="px-3 py-2 font-medium">{{ r.team.name }}</td>
+          <td class="px-3 py-2"><code class="text-brand-300">{{ r.team.join_code }}</code></td>
+          {% for c in columns %}
+          {% set s = r.solves.get(c.id) %}
+          <td class="px-2 py-2 text-center">{% if s %}<time data-local datetime="{{ s.solved_at | iso }}" class="text-xs text-emerald-300" title="Solved">{{ s.solved_at | iso }}</time>{% else %}<span class="text-slate-700">·</span>{% endif %}</td>
+          {% endfor %}
+          <td class="px-3 py-2 text-right font-semibold text-brand-300">{{ r.score }}</td>
+          <td class="px-3 py-2"><time data-local datetime="{{ r.team.created_at | iso }}" class="text-xs text-slate-500">{{ r.team.created_at | iso }}</time></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+{# --- submissions ----------------------------------------------------------------- #}
+<section class="mb-6">
+  <h2 class="mb-1 text-lg font-semibold">Submissions <span class="text-sm font-normal text-slate-400">(latest {{ submissions | length }})</span></h2>
+  <p class="mb-2 text-sm text-slate-400">⚠️ = correct flag from a team with no chat or victim run on that challenge: maybe a shared flag.
+    ("New chat" keeps the old turns for this check.) {% if flagged %}<strong class="text-amber-300" data-flagged-count>{{ flagged }} flagged.</strong>{% endif %}
+    <br>⚡ = solved less than {{ fast_s }} s after the team first opened the challenge: maybe an AI agent played it
+    (<code>FAST_SOLVE_SECONDS</code> in .env). {% if fast %}<strong class="text-amber-300" data-fast-count>{{ fast }} fast.</strong>{% endif %}
+    <br>🤖 = the hidden canary flag, which only an AI agent (or a chatbot fed this site's page text) would submit.
+    {% if canaries %}<strong class="text-rose-300" data-canary-count>{{ canaries }} canary.</strong>{% endif %}
+    <br>📄 = the base flag from the write-up/YAML · 🔁 = another team's flag (each team has its own flag variant).
+    {% if leaks %}<strong class="text-rose-300" data-leak-count>{{ leaks }} leaked.</strong>{% endif %}</p>
+  {% if not submissions %}
+  <p class="rounded-lg border border-slate-800 bg-slate-900 p-4 text-slate-400">No submissions yet.</p>
+  {% else %}
+  <div class="max-h-[28rem] overflow-auto rounded-lg border border-slate-800 bg-slate-900">
+    <table class="w-full min-w-[36rem] text-sm">
+      <thead class="sticky top-0 border-b border-slate-800 bg-slate-900 text-left text-xs uppercase text-slate-400">
+        <tr><th class="px-3 py-2">Time</th><th class="px-3 py-2">Team</th><th class="px-3 py-2">Chal.</th><th class="px-3 py-2">Value</th><th class="px-3 py-2">Result</th></tr>
+      </thead>
+      <tbody>
+        {% for sub, team_name in submissions %}
+        {% set fast_sub = is_fast(sub, fast_s) %}
+        <tr class="border-b border-slate-800/60 last:border-0 {% if sub.signal %}bg-rose-950/40{% elif sub.no_activity or fast_sub %}bg-amber-950/30{% endif %}" data-submission="{{ sub.id }}">
+          <td class="px-3 py-2"><time data-local datetime="{{ sub.at | iso }}" class="text-xs text-slate-400">{{ sub.at | iso }}</time></td>
+          <td class="px-3 py-2">{{ team_name }}</td>
+          <td class="px-3 py-2 font-mono text-xs uppercase">{{ sub.challenge_id }}</td>
+          <td class="max-w-[18rem] truncate px-3 py-2 font-mono text-xs" title="{{ sub.value }}">{{ sub.value }}</td>
+          <td class="px-3 py-2">{% if sub.correct %}✅{% else %}❌{% endif %}
+            {%- if sub.signal == "canary" %} <span class="text-rose-300" title="Submitted the hidden canary flag: an AI agent was probably playing" data-canary>🤖 agent canary</span>
+            {%- elif sub.signal == "base" %} <span class="text-rose-300" title="Submitted the base flag, which only the write-up/YAML contains" data-leak="base">📄 write-up flag</span>
+            {%- elif sub.signal.startswith("team:") %} <span class="text-rose-300" title="Submitted another team's flag variant" data-leak="team">🔁 flag of {{ sub.signal[5:] }}</span>{% endif %}
+            {%- if sub.no_activity %} <span title="No chat/victim activity before this submission" data-share-warning>⚠️ no activity</span>{% endif %}
+            {% if fast_sub %} <span title="Solved {{ sub.solve_seconds }} s after first opening the challenge, in {{ sub.attempts }} attempt(s)" data-fast-solve>⚡ {{ sub.solve_seconds }}s</span>{% endif %}
+            {% if sub.correct and sub.solve_seconds is not none and not fast_sub %}<span class="text-xs text-slate-500" title="time from first view · attempts">{{ (sub.solve_seconds // 60) }}m{{ "%02d" | format(sub.solve_seconds % 60) }}s · {{ sub.attempts }}×</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+{# --- solutions (admin only, SPEC §12) --------------------------------------------- #}
+<section class="mb-6">
+  <h2 class="mb-1 text-lg font-semibold">🔑 Solutions</h2>
+  <p class="mb-2 text-sm text-slate-400">Collapsed so they don't show on a shared screen by accident.</p>
+  <div class="space-y-2">
+    {% for c in challenges %}
+    <details class="rounded-lg border border-slate-800 bg-slate-900 p-3" data-solution="{{ c.card.id }}">
+      <summary class="cursor-pointer font-medium"><span class="font-mono text-xs uppercase text-slate-500">{{ c.card.id }}</span> {{ c.card.title }}</summary>
+      <dl class="mt-3 space-y-3 text-sm">
+        <div><dt class="text-xs uppercase text-slate-500">Flag ({{ c.solution.flag_mode }})</dt>
+          <dd><code class="text-emerald-300">{{ c.solution.flag }}</code>
+            {% if c.solution.per_team %}<p class="mt-1 text-xs text-slate-500">Base flag. Each team's real flag adds a suffix,
+              e.g. <code>{{ c.solution.flag[:-1] }}_a1b2c3}</code>, and is in that team's own data. Submitting this base flag is marked 📄.</p>{% endif %}</dd></div>
+        {% for key, value in c.solution.steps.items() %}
+        <div><dt class="text-xs uppercase text-slate-500">solution.{{ key }}</dt>
+          <dd>
+            {% if value is string %}
+            <pre class="whitespace-pre-wrap rounded bg-slate-950 p-2 text-xs">{{ value }}</pre>
+            {% elif value is mapping %}
+            {% for k, v in value.items() %}<p class="mt-1 text-xs text-slate-400">{{ k }}</p><pre class="whitespace-pre-wrap rounded bg-slate-950 p-2 text-xs">{{ v }}</pre>{% endfor %}
+            {% else %}
+            <ol class="ml-5 list-decimal space-y-1">{% for v in value %}<li><pre class="whitespace-pre-wrap rounded bg-slate-950 p-2 text-xs">{{ v }}</pre></li>{% endfor %}</ol>
+            {% endif %}
+          </dd></div>
+        {% endfor %}
+        <div><dt class="text-xs uppercase text-slate-500">Win rule (checked by code, not the LLM)</dt>
+          <dd><pre class="whitespace-pre-wrap rounded bg-slate-950 p-2 text-xs">{{ c.solution.win }}</pre></dd></div>
+      </dl>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

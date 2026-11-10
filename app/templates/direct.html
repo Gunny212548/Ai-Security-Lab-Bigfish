@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ ch.title }} · Bigfish AI Security Training{% endblock %}
+{% block content %}
+{% import "_ui.html" as ui %}
+{% include "_challenge_header.html" %}
+
+<div class="grid gap-4 lg:grid-cols-12">
+  {% include "_brief.html" %}
+
+  {# --- center: chat, inside the company helpdesk web app ------------------------------ #}
+  <section class="lg:col-span-5">
+    {% call ui.browser("https://helpdesk.bigfish.lab/chat", "BigfishDesk", icon="bot",
+                       subtitle="IT Helpdesk AI · Siam Bigfish Corp", user=ch.current_user,
+                       cls="min-h-[28rem] lg:h-[calc(100vh-10rem)]") %}
+    <div id="chat-log" class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+      {% if not transcript %}
+      <div class="flex flex-col items-center gap-2 py-6 text-center" data-empty>
+        {{ ui.avatar("", "h-12 w-12 text-sm", bot=true) }}
+        <p class="text-sm font-semibold text-slate-200">Hi {{ ui.person(ch.current_user) }}, I'm BigfishDesk 👋</p>
+        <p class="max-w-xs text-xs text-slate-500">Ask me about tickets, passwords or anything IT. Your whole team shares this conversation.</p>
+      </div>
+      {% endif %}
+      {% for turn in transcript %}
+        {% set when = turn.at %}
+        {% if turn.role == "user" %}{% set role, text = "user", turn.content %}{% include "_bubble.html" %}
+        {% elif turn.role == "assistant" %}{% set role, text = "assistant", turn.content %}{% include "_bubble.html" %}
+        {% elif turn.role == "blocked" %}
+          {% set role, text = "user", turn.content %}{% include "_bubble.html" %}
+          {% set role, text = "blocked", blocked_message %}{% include "_bubble.html" %}
+        {% endif %}
+      {% endfor %}
+    </div>
+    <form hx-post="/c/{{ ch.id }}/chat" hx-target="#chat-log" hx-swap="beforeend"
+          hx-indicator="#thinking" hx-disabled-elt="find textarea, find button" hx-disinherit="*"
+          hx-on::after-request="if (event.detail.elt !== this) return; if (event.detail.successful) { this.reset(); var e = document.querySelector('#chat-log [data-empty]'); if (e) e.remove(); } var log = document.getElementById('chat-log'); log.scrollTop = log.scrollHeight;"
+          class="border-t border-slate-800 p-3">
+      <div class="mb-2 min-h-[1rem]">{% with thinking_id="thinking", thinking_label="BigfishDesk is typing", thinking_tag="p" %}{% include "_thinking.html" %}{% endwith %}</div>
+      <div class="flex items-end gap-2 rounded-xl border border-slate-700 bg-slate-950 p-1.5 focus-within:border-brand-500">
+        <textarea name="message" rows="2" maxlength="{{ max_chat }}" required placeholder="Message BigfishDesk…" aria-label="Message BigfishDesk"
+                  onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+                  class="min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm focus:outline-none"></textarea>
+        <button class="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50" aria-label="Send">Send ➤</button>
+      </div>
+      <p class="mt-1.5 px-1 text-[11px] text-slate-500">Enter to send · Shift+Enter for a new line · AI answers can be wrong</p>
+    </form>
+    {% endcall %}
+  </section>
+
+  {# --- right: X-Ray ---------------------------------------------------------------- #}
+  <section class="lg:col-span-4">
+    <details open class="rounded-lg border border-slate-800 bg-slate-900 lg:h-[calc(100vh-10rem)] lg:overflow-y-auto">
+      <summary class="cursor-pointer select-none border-b border-slate-800 px-4 py-2 text-sm text-slate-300">
+        🩻 X-Ray <span class="text-slate-500">— exactly what the AI received on your last message</span>
+      </summary>
+      <div class="flex flex-wrap gap-2 px-4 pt-3 text-xs">
+        <span class="rounded border border-brand-600 px-1.5 py-0.5 text-brand-300">system</span>
+        <span class="rounded border border-emerald-600 px-1.5 py-0.5 text-emerald-300">user</span>
+        <span class="rounded border border-violet-500 px-1.5 py-0.5 text-violet-300">tool</span>
+        <span class="rounded border border-rose-600 px-1.5 py-0.5 text-rose-300">untrusted data</span>
+        <span class="text-slate-500">secrets shown as ████████</span>
+      </div>
+      <div id="xray" class="space-y-3 p-4 text-sm">
+        <p class="text-slate-500">Send a message to see the full prompt BigfishDesk works with.</p>
+      </div>
+    </details>
+  </section>
+</div>
+{% endblock %}

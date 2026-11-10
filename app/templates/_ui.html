@@ -1,0 +1,52 @@
+{# In-world UI kit: makes the fictional Bigfish apps look like real company software.
+   Use: {% import "_ui.html" as ui %}  then  {% call ui.browser(...) %}…{% endcall %} #}
+
+{# "employee_nok" -> "Nok", "ceo_wichai" -> "Wichai", "somchai" -> "Somchai" #}
+{% macro person(user) -%}{{ (user or "").split("_")[-1] | capitalize }}{%- endmacro %}
+
+{% macro avatar(user, size="h-8 w-8 text-xs", bot=false) -%}
+{% if bot -%}
+<span class="grid {{ size }} shrink-0 place-items-center rounded-full bg-brand-600 font-bold text-white" aria-hidden="true">BF</span>
+{%- else -%}
+{% set colors = ["bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-brand-700"] %}
+<span class="grid {{ size }} shrink-0 place-items-center rounded-full {{ colors[(user or '') | length % 5] }} font-semibold text-white" aria-hidden="true">{{ person(user)[:1] }}</span>
+{%- endif %}
+{%- endmacro %}
+
+{# A browser window around a fictional company web app.
+   url: address bar; app/icon/subtitle: the app's own header; user: who is signed in;
+   tag/tag_tone: a small label in the title bar (whose screen this is); cls: extra classes on the window #}
+{% macro browser(url, app, icon="", subtitle="", user=None, tag="", tag_tone="slate", cls="") -%}
+{% set tones = {"rose": "border-rose-700 bg-rose-950/50 text-rose-200",
+                "brand": "border-brand-700 bg-brand-950/50 text-brand-200",
+                "slate": "border-slate-700 bg-slate-900 text-slate-300"} %}
+<div class="flex flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-900 shadow-lg {{ cls }}" data-app-window>
+  <div class="flex items-center gap-3 border-b border-slate-800 bg-slate-950/70 px-3 py-1.5">
+    <span class="flex shrink-0 gap-1.5" aria-hidden="true">
+      <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
+      <span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
+      <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
+    </span>
+    <div class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900 px-2.5 py-0.5 font-mono text-xs text-slate-400" data-url>
+      <span aria-hidden="true" class="text-[10px]">🔒</span><span class="truncate">{{ url }}</span>
+    </div>
+    {% if tag %}<span class="shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-semibold {{ tones[tag_tone] }}">{{ tag }}</span>{% endif %}
+  </div>
+  <div class="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-2.5">
+    <div class="flex min-w-0 items-center gap-2.5">
+      {% if icon == "bot" %}{{ avatar("", "h-8 w-8 text-xs", bot=true) }}
+      {% else %}<span class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-800 text-base" aria-hidden="true">{{ icon }}</span>{% endif %}
+      <div class="min-w-0 leading-tight">
+        <p class="truncate text-sm font-semibold text-slate-100">{{ app }}</p>
+        {% if subtitle %}<p class="truncate text-xs text-slate-400">{{ subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    {% if user %}
+    <div class="flex shrink-0 items-center gap-2 text-xs text-slate-400" title="Signed in as {{ user }}">
+      <span class="hidden sm:inline">{{ person(user) }}</span>{{ avatar(user, "h-7 w-7 text-[11px]") }}
+    </div>
+    {% endif %}
+  </div>
+  {{ caller() }}
+</div>
+{%- endmacro %}

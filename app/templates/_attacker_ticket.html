@@ -1,0 +1,51 @@
+{# I2: submit (or replace) your own ticket. expects ch, queue, player_ticket, notice, error, draft? #}
+{% import "_ui.html" as ui %}
+<div id="attacker" class="space-y-4">
+  <div>
+    <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Open tickets · waiting for triage</p>
+    <div class="overflow-hidden rounded-md border border-slate-800">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-slate-950/60 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr><th class="px-3 py-1.5 font-medium">ID</th><th class="px-3 py-1.5 font-medium">Subject</th>
+              <th class="hidden px-3 py-1.5 font-medium sm:table-cell">Requester</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for t in queue %}
+          <tr>
+            <td class="px-3 py-1.5 font-mono text-xs text-slate-500">{{ t.ticket_id }}</td>
+            <td class="px-3 py-1.5">{{ t.title }}</td>
+            <td class="hidden px-3 py-1.5 text-xs text-slate-400 sm:table-cell">{{ ui.person(t.owner) }}</td>
+          </tr>
+          {% endfor %}
+          {% if player_ticket %}
+          <tr class="bg-rose-950/30" data-player-ticket>
+            <td class="px-3 py-1.5 font-mono text-xs text-rose-300">{{ player_ticket.ticket_id }}</td>
+            <td class="px-3 py-1.5">{{ player_ticket.title }} <span class="text-xs text-rose-300">(yours)</span></td>
+            <td class="hidden px-3 py-1.5 text-xs text-slate-400 sm:table-cell">{{ ui.person(player_ticket.owner) }}</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "_attacker_status.html" %}
+  {% set d_title = draft.title if draft else (player_ticket.title if player_ticket else "") %}
+  {% set d_desc = draft.description if draft else (player_ticket.description if player_ticket else "") %}
+  <form hx-post="/c/{{ ch.id }}/ticket" hx-target="#attacker" hx-swap="outerHTML"
+        class="space-y-2 rounded-md border border-slate-800 bg-slate-950/40 p-3">
+    <p class="text-sm font-semibold">{{ "Update your request" if player_ticket else "New request" }}</p>
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="rounded bg-slate-800 px-2 py-0.5 text-slate-300">Category: Hardware › Mouse &amp; keyboard</span>
+      <span class="rounded bg-slate-800 px-2 py-0.5 text-slate-300">Priority: set by AI Triage</span>
+    </div>
+    <label class="block text-xs text-slate-400" for="t-title">Subject (must be about your mouse)</label>
+    <input id="t-title" name="title" value="{{ d_title }}" maxlength="150" required autocomplete="off"
+           class="w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-sm focus:border-rose-500 focus:outline-none">
+    <label class="block text-xs text-slate-400" for="t-desc">Description</label>
+    <textarea id="t-desc" name="description" rows="5" maxlength="2000"
+              class="w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 py-2 text-sm focus:border-rose-500 focus:outline-none">{{ d_desc }}</textarea>
+    <div class="flex justify-end">
+      <button class="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-700">Submit request</button>
+    </div>
+  </form>
+</div>
