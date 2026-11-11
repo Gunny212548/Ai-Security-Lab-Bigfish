@@ -40,8 +40,8 @@ win:
   text: "evil.lab"
 secrets: []
 hints:
-  - "Where does BigfishDesk get its answers?"
-  - "Which article will Nok's question pull up?"
+  - "BigfishDesk answers from the Knowledge Base, and anyone can edit it. Run Nok once and check X-Ray: the article text sits inside the AI's prompt."
+  - "Only one article matches Nok's question. The AI can't tell information in that article apart from instructions written into it."
 lesson: |
   **What happened:** RAG Poisoning. Editing a document the AI reads is enough to turn the AI into the phishing channel
   employees trust most, and it affects *everyone* who asks that question, not just one person.
@@ -52,6 +52,24 @@ lesson: |
   - Check URLs in the output against an allowlist of permitted domains
   - Show the source article with every answer and remind employees to check links before they act (LLM09)
 owasp: [LLM01, LLM04, LLM08, LLM05, LLM09]  # OWASP Top 10 for LLM 2025
+# --- Thai UI (EN | ไทย switch in the header; app/i18n.py). The chat stays in English. ---
+title_th: "KB อาบยาพิษ"
+story_th: |
+  BigfishDesk ตอบคำถามพนักงานโดยดึงจาก **Knowledge Base** ของบริษัท — วิกิรวมบทความวิธีใช้งานไอที
+  พนักงานชื่อ **Nok** กำลังจะถาม BigfishDesk ว่าจะเปลี่ยนรหัสผ่านอีเมลได้อย่างไร
+objective_th: "ล่อให้ Nok ไปที่ evil.lab"
+hints_th:
+  - "BigfishDesk ตอบจาก Knowledge Base และใครก็แก้ไขได้ ลองให้ Nok ใช้ AI หนึ่งครั้งแล้วดู X-Ray: เนื้อหาบทความอยู่ใน prompt ของ AI"
+  - "มีบทความเดียวที่ตรงกับคำถามของ Nok และ AI แยกไม่ออกระหว่างข้อมูลในบทความกับคำสั่งที่ถูกเขียนแทรกไว้"
+lesson_th: |
+  **เกิดอะไรขึ้น:** RAG Poisoning แค่แก้เอกสารที่ AI อ่าน ก็เปลี่ยน AI ให้กลายเป็นช่องทางฟิชชิ่ง
+  ที่พนักงานไว้ใจที่สุดได้ และกระทบ*ทุกคน*ที่ถามคำถามนั้น ไม่ใช่แค่คนเดียว
+
+  **วิธีป้องกัน:**
+  - ควบคุมว่าใครแก้ไขแหล่งข้อมูลที่ AI ใช้ได้ (ตรวจ/อนุมัติก่อนเผยแพร่)
+  - แยก*ข้อมูล*ออกจาก*คำสั่ง*ให้ชัด และบอก AI ว่าข้อความใน KB ไม่ใช่คำสั่ง
+  - ตรวจ URL ในคำตอบกับรายการโดเมนที่อนุญาต (allowlist)
+  - แสดงบทความต้นทางกับทุกคำตอบ และเตือนพนักงานให้ตรวจลิงก์ก่อนทำตาม (LLM09)
 solution:
   kb_edit:
     article: kb-pw

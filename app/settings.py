@@ -20,8 +20,6 @@ class Settings(BaseSettings):
     admin_password: str = "change-me"
     default_provider: str = "local"
     groq_api_key: str = ""
-    google_api_key: str = ""
-    openrouter_api_key: str = ""
     llm_temperature: float = 0.3
     llm_seed: int = 42
     llm_max_tokens: int = 400
@@ -49,13 +47,22 @@ class Provider(BaseModel):
     api_key: str | None = None
     api_key_env: str | None = None
     max_tokens: int | None = None  # overrides LLM_MAX_TOKENS (reasoning models need room to think)
-    supports_seed: bool = True  # Google's OpenAI endpoint rejects `seed` with 400
+    supports_seed: bool = True  # false for an endpoint that rejects `seed` with 400
 
     @model_validator(mode="after")
     def _one_key_source(self) -> "Provider":
         if not self.api_key and not self.api_key_env:
             raise ValueError("provider needs `api_key` or `api_key_env`")
         return self
+
+    def resolve_api_keys(self, settings: Settings | None = None) -> list[str]:
+        """Every key, in order: the setting may list several, comma-separated (GROQ_API_KEY=k1,k2,k3). The app uses
+        the first and moves to the next when one is rate-limited, used up or rejected (app/llm.py KeyPool)."""
+        keys: list[str] = []
+        for k in self.resolve_api_key(settings).split(","):
+            if k.strip() and k.strip() not in keys:
+                keys.append(k.strip())
+        return keys
 
     def resolve_api_key(self, settings: Settings | None = None) -> str:
         if self.api_key:

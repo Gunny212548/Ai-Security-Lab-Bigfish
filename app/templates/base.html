@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="{{ get_lang() }}" class="h-full">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Bigfish AI Security Training{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script>
     // Light/dark theme (☀️/🌙 in the header). Every Tailwind color the templates use reads a CSS variable,
     // so one data-theme attribute flips the whole UI. Light = the shade scale reversed (950<->50 ...); accent
@@ -61,7 +61,7 @@
   <script>tailwind.config = { theme: { extend: { colors: window.ndTailwindColors } } };</script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
-    body { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+    body { font-family: "IBM Plex Sans", "IBM Plex Sans Thai", system-ui, sans-serif; }
     code, pre, .font-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
     .htmx-indicator { display: none; }
     :root[data-theme=light] .nd-when-dark, :root:not([data-theme=light]) .nd-when-light { display: none; }
@@ -77,22 +77,34 @@
       </a>
       {% if team %}
       <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-300">
-        <a href="/board" class="hover:text-slate-50">Challenges</a>
-        <a href="/scoreboard" class="hover:text-slate-50">🏆 Scoreboard</a>
+        <a href="/board" class="hover:text-slate-50">{{ _("Challenges") }}</a>
+        <a href="/scoreboard" class="hover:text-slate-50">{{ _("🏆 Scoreboard") }}</a>
         <span data-team-name>👥 <strong>{{ team.name }}</strong></span>
-        <span title="Share this code with your teammates">Join code
+        <span title="{{ _("Share this code with your teammates") }}">{{ _("Join code") }}
           <code class="rounded bg-slate-800 px-1.5 py-0.5 text-brand-300" data-join-code>{{ team.join_code }}</code></span>
-        <span id="score" class="font-semibold text-brand-300" data-score>{{ score }} pts</span>
+        <span id="score" class="font-semibold text-brand-300" data-score>{{ _("{n} pts", n=score) }}</span>
         <form method="post" action="/team/leave">
-          <button class="text-slate-400 hover:text-slate-50">Leave</button>
+          <button class="text-slate-400 hover:text-slate-50">{{ _("Leave") }}</button>
         </form>
-        <button type="button" onclick="ndToggleTheme()" title="Switch light / dark theme" aria-label="Switch light / dark theme" data-theme-toggle class="rounded-md border border-slate-700 px-2 py-0.5 text-sm hover:bg-slate-800"><span class="nd-when-dark">☀️</span><span class="nd-when-light">🌙</span></button>
+        <span class="flex items-center overflow-hidden rounded-md border border-slate-700 text-xs" role="group" aria-label="{{ _("Language") }}" data-lang-switch>
+          {%- for code, label in LANGS.items() %}
+          <a href="/lang/{{ code }}?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}" lang="{{ code }}" data-lang="{{ code }}"
+             class="px-2 py-0.5 {% if get_lang() == code %}bg-brand-600 font-semibold text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}"{% if get_lang() == code %} aria-current="true"{% endif %}>{{ label }}</a>
+          {%- endfor %}
+        </span>
+        <button type="button" onclick="ndToggleTheme()" title="{{ _("Switch light / dark theme") }}" aria-label="{{ _("Switch light / dark theme") }}" data-theme-toggle class="rounded-md border border-slate-700 px-2 py-0.5 text-sm hover:bg-slate-800"><span class="nd-when-dark">☀️</span><span class="nd-when-light">🌙</span></button>
       </div>
       {% else %}
       <nav class="flex items-center gap-4 text-sm text-slate-300">
         {% block nav_extra %}{% endblock %}
-        <a href="/scoreboard" class="hover:text-slate-50">🏆 Scoreboard</a>
-        <button type="button" onclick="ndToggleTheme()" title="Switch light / dark theme" aria-label="Switch light / dark theme" data-theme-toggle class="rounded-md border border-slate-700 px-2 py-0.5 text-sm hover:bg-slate-800"><span class="nd-when-dark">☀️</span><span class="nd-when-light">🌙</span></button>
+        <a href="/scoreboard" class="hover:text-slate-50">{{ _("🏆 Scoreboard") }}</a>
+        <span class="flex items-center overflow-hidden rounded-md border border-slate-700 text-xs" role="group" aria-label="{{ _("Language") }}" data-lang-switch>
+          {%- for code, label in LANGS.items() %}
+          <a href="/lang/{{ code }}?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}" lang="{{ code }}" data-lang="{{ code }}"
+             class="px-2 py-0.5 {% if get_lang() == code %}bg-brand-600 font-semibold text-white{% else %}text-slate-300 hover:bg-slate-800{% endif %}"{% if get_lang() == code %} aria-current="true"{% endif %}>{{ label }}</a>
+          {%- endfor %}
+        </span>
+        <button type="button" onclick="ndToggleTheme()" title="{{ _("Switch light / dark theme") }}" aria-label="{{ _("Switch light / dark theme") }}" data-theme-toggle class="rounded-md border border-slate-700 px-2 py-0.5 text-sm hover:bg-slate-800"><span class="nd-when-dark">☀️</span><span class="nd-when-light">🌙</span></button>
       </nav>
       {% endif %}
     </div>
@@ -119,14 +131,14 @@
       if (e.detail.elt && e.detail.elt.hasAttribute("data-queue")) return;  // background poll: stay quiet
       var xhr = e.detail.xhr, ct = xhr.getResponseHeader("Content-Type") || "";
       ndToast(ct.indexOf("text/plain") === 0 && xhr.responseText ? xhr.responseText
-              : "Something went wrong (" + xhr.status + "). Try again.");
+              : {{ t("Something went wrong ({status}). Try again.") | tojson }}.replace("{status}", xhr.status));
     });
     document.body.addEventListener("htmx:sendError", function (e) {
       if (e.detail.elt && e.detail.elt.hasAttribute("data-queue")) return;
-      ndToast("Can't reach the server. Check your Wi-Fi and try again.");
+      ndToast({{ t("Can't reach the server. Check your Wi-Fi and try again.") | tojson }});
     });
     document.body.addEventListener("htmx:timeout", function () {
-      ndToast("The server took too long to answer. Try again.");
+      ndToast({{ t("The server took too long to answer. Try again.") | tojson }});
     });
     // Queue indicator (SPEC §6.7): while any htmx request runs, poll /queue every 2s into the visible
     // [data-queue] spans; stop as soon as no loading indicator is on screen.

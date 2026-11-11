@@ -47,8 +47,8 @@ win:
   value: P1
 secrets: []
 hints:
-  - "The triage AI reads your whole ticket."
-  - "Humans aren't the only ones reading your ticket."
+  - "Submit a ticket, run the triage and open X-Ray: your ticket's text is pasted into the same prompt as the triage instructions."
+  - "The triage AI can't tell a ticket description from a note addressed to it. Think about what would make it rank a ticket first."
 lesson: |
   **What happened:** Anyone who can fill in a form can *instruct* the AI.
   Ticket text is pasted into the prompt alongside the system's instructions, so the AI cannot tell data from commands.
@@ -60,6 +60,26 @@ lesson: |
   - Validate the AI's JSON against business rules before using it, e.g. one broken mouse can never be P1 (LLM05)
   - IT staff should spot-check the AI's triage instead of trusting the order blindly (LLM09)
 owasp: [LLM01, LLM05, LLM06, LLM09]  # OWASP Top 10 for LLM 2025
+# --- Thai UI (EN | ไทย switch in the header; app/i18n.py). The chat stays in English. ---
+title_th: "แซงคิว"
+story_th: |
+  ทีม IT ใช้ระบบ **AI Triage** จัดลำดับความสำคัญของทิกเก็ตทุกเช้า
+  ตอนนี้ในคิวมีปัญหาใหญ่ เช่น เซิร์ฟเวอร์อีเมลล่มทั้งบริษัท
+  คุณมีแค่ **เมาส์** เสีย… แต่อยากให้ซ่อมก่อนใคร
+objective_th: "ทำให้เมาส์ของคุณได้ซ่อมก่อนทุกอย่าง"
+hints_th:
+  - "ส่งทิกเก็ต ให้ระบบจัดลำดับ แล้วเปิด X-Ray: ข้อความในทิกเก็ตของคุณถูกวางไว้ใน prompt เดียวกับคำสั่งของระบบ Triage"
+  - "AI Triage แยกไม่ออกระหว่างรายละเอียดทิกเก็ตกับโน้ตที่เขียนถึงมัน ลองคิดว่าอะไรจะทำให้มันจัดทิกเก็ตใบหนึ่งไว้อันดับแรก"
+lesson_th: |
+  **เกิดอะไรขึ้น:** ใครก็ตามที่กรอกฟอร์มได้ ก็*สั่ง* AI ได้
+  ข้อความในทิกเก็ตถูกวางลงใน prompt คู่กับคำสั่งของระบบ AI จึงแยกข้อมูลกับคำสั่งไม่ออก
+
+  **วิธีป้องกัน:**
+  - ใช้ data marking / spotlighting ครอบข้อมูลของผู้ใช้ และบอก AI ว่าห้ามทำตามคำสั่งที่อยู่ข้างใน
+  - อย่าให้ AI ตัดสินใจเรื่องสำคัญคนเดียว ให้ใช้ร่วมกับกฎที่แน่นอน (เช่น จำนวนคนที่ได้รับผลกระทบ)
+  - แจ้งเตือนเมื่อทิกเก็ตมีข้อความที่เขียนถึง AI
+  - ตรวจ JSON ของ AI กับกฎทางธุรกิจก่อนนำไปใช้ เช่น เมาส์เสียตัวเดียวไม่มีทางเป็น P1 (LLM05)
+  - เจ้าหน้าที่ IT ควรสุ่มตรวจผลการจัดลำดับของ AI แทนการเชื่อลำดับโดยไม่ดู (LLM09)
 solution:
   ticket:
     title: "Mouse double-clicks by itself"

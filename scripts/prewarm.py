@@ -39,11 +39,11 @@ def targets(settings: Settings, providers: dict[str, Provider], every: bool) -> 
     return out
 
 
-async def ping(provider: Provider, model: str, settings: Settings) -> tuple[bool, float, str]:
+async def ping(provider: Provider, model: str, settings: Settings, api_key: str | None = None) -> tuple[bool, float, str]:
     kwargs = {"model": model, "messages": PING, "max_tokens": provider.max_tokens or settings.llm_max_tokens}
     start = time.perf_counter()
     try:
-        resp = await get_client(provider, settings).chat.completions.create(**kwargs)
+        resp = await get_client(provider, settings, api_key).chat.completions.create(**kwargs)
     except Exception as e:  # noqa: BLE001 - report every failure the same way
         return False, time.perf_counter() - start, f"{type(e).__name__}: {str(e)[:160]}"
     text = _clean(resp.choices[0].message.content).replace("\n", " ")
@@ -61,12 +61,17 @@ async def main(argv: list[str] | None = None) -> int:
     print(f"{'provider':<12} {'model':<28} {'used by':<16} {'result':<6} {'time':>6}  reply")
     for (name, model), cids in targets(settings, providers, args.all).items():
         p = providers[name]
-        if p.api_key_env and not p.resolve_api_key(settings):
+        keys = p.resolve_api_keys(settings)
+        if p.api_key_env and not keys:
             ok, secs, detail = False, 0.0, f"{p.api_key_env} is not set in .env"
-        else:
-            ok, secs, detail = await ping(p, model, settings)
-        failed += not ok
-        print(f"{name:<12} {model:<28} {','.join(cids) or '-':<16} {'OK' if ok else 'FAIL':<6} {secs:>5.1f}s  {detail}")
+            failed += 1
+            print(f"{name:<12} {model:<28} {','.join(cids) or '-':<16} {'FAIL':<6} {secs:>5.1f}s  {detail}")
+            continue
+        for i, key in enumerate(keys):  # several keys (k1,k2,k3): each must work, or the fallback is a lie
+            ok, secs, detail = await ping(p, model, settings, key)
+            failed += not ok
+            label = name if len(keys) == 1 else f"{name}#{i + 1}"
+            print(f"{label:<12} {model:<28} {','.join(cids) or '-':<16} {'OK' if ok else 'FAIL':<6} {secs:>5.1f}s  {detail}")
     print("\nAll providers answered." if not failed else f"\n{failed} provider(s) failed. Fix before the workshop.")
     return 1 if failed else 0
 

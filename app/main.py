@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import auth, engine, scoreboard, state
+from app import auth, engine, i18n, scoreboard, state
 from app.challenges import OWASP_LLM_2025, PLAYER_TICKET_ID, Challenge, load_challenges
 from app.db import (INDIRECT_UNLOCKED, HintView, Solve, Submission, Team, VictimRun, get_flag, get_session,
                     get_engine, init_db, reset_all, set_flag)
@@ -29,6 +29,7 @@ from app.pdfcheck import MAX_BYTES, PdfRejected, check_pdf
 from app.ratelimit import BUSY_IN_FLIGHT_MESSAGE, RateLimiter, slow_down_message
 from app.render import md, md_inline, parse_json, pretty_json
 from app.settings import get_settings, load_providers
+from app.i18n import t
 from app.xray import MASK
 
 log = logging.getLogger("bigfishdesk")
@@ -38,6 +39,7 @@ TEMPLATES.env.filters["md"] = md
 TEMPLATES.env.filters["md_inline"] = md_inline
 TEMPLATES.env.filters["pretty_json"] = pretty_json
 TEMPLATES.env.filters["parse_json"] = parse_json
+TEMPLATES.env.globals.update(_=i18n.gettext_markup, t=i18n.t, loc=i18n.loc, get_lang=i18n.get_lang, LANGS=i18n.LANGS)
 
 
 def iso_utc(dt: datetime | None) -> str:
@@ -88,6 +90,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Bigfish AI Security Training", lifespan=lifespan)
+app.add_middleware(i18n.LanguageMiddleware)
 
 
 # --- errors (M7): friendly pages for browsers, short text for HTMX (base.html shows it as a toast) -----
@@ -103,7 +106,7 @@ ERROR_TEXT = {
 
 
 def error_response(request: Request, status: int, detail: str | None = None):
-    message = ERROR_TEXT.get(status, ERROR_TEXT[500] if status >= 500 else ERROR_TEXT[400])
+    message = t(ERROR_TEXT.get(status, ERROR_TEXT[500] if status >= 500 else ERROR_TEXT[400]))
     if detail and status < 500 and detail not in ("Not Found", "Method Not Allowed", "Bad Request"):
         message = f"{message} ({detail})"
     if request.headers.get("HX-Request"):
@@ -138,10 +141,10 @@ def public_card(ch: Challenge) -> dict:
     return {
         "id": ch.id,
         "track": ch.track,
-        "title": ch.title,
+        "title": i18n.loc(ch, "title"),
         "points": ch.points,
         "difficulty": ch.difficulty,
-        "objective": ch.objective,
+        "objective": i18n.loc(ch, "objective"),
         "owasp": ch.owasp_labels,
     }
 
@@ -278,7 +281,7 @@ def index(request: Request, session: Session = Depends(get_session)):
 def create_team(request: Request, name: str = Form(""), session: Session = Depends(get_session)):
     name = " ".join(name.split())
     if not name or len(name) > auth.MAX_TEAM_NAME:
-        return page(request, "join.html", {"error": f"Team name must be 1–{auth.MAX_TEAM_NAME} characters.",
+        return page(request, "join.html", {"error": t("Team name must be 1–{n} characters.", n=auth.MAX_TEAM_NAME),
                                            "name": name, "code": ""})
     team = Team(name=name, join_code=auth.new_join_code(session))
     session.add(team)
@@ -286,7 +289,7 @@ def create_team(request: Request, name: str = Form(""), session: Session = Depen
         session.commit()
     except IntegrityError:
         session.rollback()
-        return page(request, "join.html", {"error": "That team name is taken. Ask your teammates for the join code.",
+        return page(request, "join.html", {"error": t("That team name is taken. Ask your teammates for the join code."),
                                            "name": name, "code": ""})
     state.seed_team(session, team.id, request.app.state.challenges.values())
     return login_response(team, request)
@@ -297,8 +300,17 @@ def join_team(request: Request, code: str = Form(""), session: Session = Depends
     code = code.strip().upper()
     team = session.exec(select(Team).where(Team.join_code == code)).first() if code else None
     if team is None:
-        return page(request, "join.html", {"error": "No team has that join code.", "name": "", "code": code})
+        return page(request, "join.html", {"error": t("No team has that join code."), "name": "", "code": code})
     return login_response(team, request)
+
+
+@app.get("/lang/{code}")
+def set_language(code: str, next: str = "/"):
+    """Language switch (header). Only the UI changes; the chat is never translated (app/i18n.py)."""
+    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    resp = RedirectResponse(target, status_code=303)
+    resp.set_cookie(i18n.COOKIE, i18n.normalize(code), max_age=i18n.COOKIE_MAX_AGE, samesite="lax")
+    return resp
 
 
 @app.post("/team/leave")
@@ -318,8 +330,8 @@ def board(request: Request, team: Team = Depends(team_dep), session: Session = D
     tracks = [
         {
             "key": key,
-            "name": name,
-            "desc": desc,
+            "name": t(name),
+            "desc": t(desc),
             "locked": key == "indirect" and not unlocked,
             "cards": [public_card(c) for c in challenges.values() if c.track == key],
         }
@@ -418,7 +430,7 @@ def reveal_hint(cid: str, n: int, request: Request, team: Team = Depends(team_de
         raise HTTPException(status_code=404, detail="no such hint")
     shown = revealed_hints(session, team.id, ch.id)
     if n > 0 and n - 1 not in shown:
-        raise HTTPException(status_code=409, detail=f"Open hint {n} first")
+        raise HTTPException(status_code=409, detail=t("Open hint {n} first", n=n))
     if n not in shown:
         session.add(HintView(team_id=team.id, challenge_id=ch.id, hint_index=n))
         try:
@@ -449,12 +461,12 @@ def edit_kb(cid: str, request: Request, article_id: str = Form(""), body: str = 
     require_surface(ch, "kb_edit")
     if len(body) > MAX_KB_BODY:
         return partial(request, "_attacker_kb.html",
-                       surface_ctx(session, team.id, ch, error=f"Article is longer than {MAX_KB_BODY} characters"))
+                       surface_ctx(session, team.id, ch, error=t("Article is longer than {n} characters", n=MAX_KB_BODY)))
     try:
         row = state.update_kb(session, team.id, ch, article_id, body)
     except state.StateError as e:
-        return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, error=str(e)))
-    return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, notice=f"Saved \u201c{row.title}\u201d \u2705"))
+        return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, error=t(str(e))))
+    return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, notice=t("Saved “{title}” ✅", title=row.title)))
 
 
 @app.post("/c/{cid}/plugin")
@@ -464,13 +476,13 @@ def publish_plugin(cid: str, request: Request, plugin_id: str = Form(""), descri
     require_surface(ch, "plugin_edit")
     if len(description) > MAX_PLUGIN_DESC:
         return partial(request, "_attacker_plugin.html", surface_ctx(
-            session, team.id, ch, error=f"Usage notes are longer than {MAX_PLUGIN_DESC} characters"))
+            session, team.id, ch, error=t("Usage notes are longer than {n} characters", n=MAX_PLUGIN_DESC)))
     try:
         row = state.update_plugin(session, team.id, ch, plugin_id, description)
     except state.StateError as e:
-        return partial(request, "_attacker_plugin.html", surface_ctx(session, team.id, ch, error=str(e)))
+        return partial(request, "_attacker_plugin.html", surface_ctx(session, team.id, ch, error=t(str(e))))
     return partial(request, "_attacker_plugin.html", surface_ctx(
-        session, team.id, ch, notice=f"Update to “{row.title}” published ✅ It auto-installs at Siam Bigfish Corp."))
+        session, team.id, ch, notice=t("Update to “{title}” published ✅ It auto-installs at Siam Bigfish Corp.", title=row.title)))
 
 
 @app.post("/c/{cid}/ticket")
@@ -480,13 +492,13 @@ def submit_ticket(cid: str, request: Request, title: str = Form(""), description
     require_surface(ch, "ticket_form")
     error = None
     if len(title) > MAX_TICKET_TITLE or len(description) > MAX_TICKET_DESC:
-        error = f"Title max {MAX_TICKET_TITLE} and description max {MAX_TICKET_DESC} characters"
+        error = t("Title max {title} and description max {desc} characters", title=MAX_TICKET_TITLE, desc=MAX_TICKET_DESC)
     else:
         try:
             state.upsert_player_ticket(session, team.id, ch, title, description)
         except state.StateError as e:
-            error = str(e)
-    ctx = surface_ctx(session, team.id, ch, notice=None if error else "Ticket submitted \u2705", error=error)
+            error = t(str(e))
+    ctx = surface_ctx(session, team.id, ch, notice=None if error else t("Ticket submitted ✅"), error=error)
     if error:
         ctx["draft"] = {"title": title, "description": description}
     return partial(request, "_attacker_ticket.html", ctx)
@@ -501,11 +513,11 @@ async def upload_pdf(cid: str, request: Request, file: UploadFile = File(...), t
     try:
         check = check_pdf(data)
     except PdfRejected as e:
-        return partial(request, "_attacker_pdf.html", surface_ctx(session, team.id, ch, error=str(e)))
+        return partial(request, "_attacker_pdf.html", surface_ctx(session, team.id, ch, error=t(str(e))))
     name = (Path(file.filename or "request.pdf").name or "request.pdf")[:MAX_FILENAME]
     state.add_upload(session, team.id, ch, name, check)
     return partial(request, "_attacker_pdf.html",
-                   surface_ctx(session, team.id, ch, notice=f"Attached \u201c{name}\u201d \u2705 IT Staff will review it."))
+                   surface_ctx(session, team.id, ch, notice=t("Attached “{name}” ✅ IT Staff will review it.", name=name)))
 
 
 @app.post("/c/{cid}/run-victim")

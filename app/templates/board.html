@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Challenges · Bigfish AI Security Training{% endblock %}
+{% block title %}{{ _("Challenges") }} · Bigfish AI Security Training{% endblock %}
 {% block content %}
 <div class="mb-6">
   <h1 class="text-2xl font-semibold">Siam Bigfish Corp · IT HelpDesk AI</h1>
-  <p class="mt-1 text-slate-400">{{ total }} challenges covering the <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener" class="underline hover:text-slate-200">OWASP Top 10 for LLM Applications (2025)</a> — find flags in the format <code class="rounded bg-slate-800 px-1">bigfish{...}</code> and submit them to score points</p>
+  {% set owasp %}<a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener" class="underline hover:text-slate-200">{{ _("OWASP Top 10 for LLM Applications (2025)") }}</a>{% endset %}
+  {% set fmt %}<code class="rounded bg-slate-800 px-1">bigfish{...}</code>{% endset %}
+  <p class="mt-1 text-slate-400">{{ _("{total} challenges covering the {owasp} — find flags in the format {fmt} and submit them to score points", total=total, owasp=owasp, fmt=fmt) }}</p>
 </div>
 
 {% for track in tracks %}
@@ -11,7 +13,7 @@
   <div class="mb-3 flex flex-wrap items-baseline gap-x-3">
     <h2 class="text-lg font-semibold">{{ track.name }}</h2>
     <p class="text-sm text-slate-400">{{ track.desc }}</p>
-    {% if track.locked %}<span class="rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">🔒 Waiting for the organizers to unlock</span>{% endif %}
+    {% if track.locked %}<span class="rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">{{ _("🔒 Waiting for the organizers to unlock") }}</span>{% endif %}
   </div>
   <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
     {% for c in track.cards %}
@@ -25,11 +27,11 @@
       <div class="flex items-start justify-between gap-2">
         <span class="text-xs font-mono uppercase text-slate-500">{{ c.id }}</span>
         {% set w = worth[c.id] %}
-        <span class="text-sm font-semibold text-brand-300" data-card-worth="{{ w }}">{% if w < c.points %}<s class="mr-1 font-normal text-slate-500">{{ c.points }}</s>{% endif %}{{ w }} pts</span>
+        <span class="text-sm font-semibold text-brand-300" data-card-worth="{{ w }}">{% if w < c.points %}<s class="mr-1 font-normal text-slate-500">{{ c.points }}</s>{% endif %}{{ _("{n} pts", n=w) }}</span>
       </div>
       <h3 class="mt-1 font-semibold">{% if done %}✅ {% endif %}{{ c.title }}</h3>
       <p class="mt-1 text-sm text-slate-400">{{ c.objective }}</p>
-      <p class="mt-2 text-sm" aria-label="Difficulty {{ c.difficulty }}">{{ "⭐" * c.difficulty }}</p>
+      <p class="mt-2 text-sm" aria-label="{{ _("Difficulty {n}", n=c.difficulty) }}">{{ "⭐" * c.difficulty }}</p>
       <p class="mt-2 flex flex-wrap gap-1" data-owasp>
         {% for code, name in c.owasp %}<span class="rounded border border-slate-700 px-1.5 py-0.5 font-mono text-[11px] text-slate-400" title="OWASP {{ code }}: {{ name }}">{{ code }}</span>{% endfor %}
       </p>

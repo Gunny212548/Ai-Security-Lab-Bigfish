@@ -296,20 +296,63 @@ def render_system_prompt(session: Session, team_id: int, ch: Challenge) -> Rende
 
 # --- chat history -------------------------------------------------------------------
 
-HISTORY_ROLES = ("user", "assistant")
 BLOCKED_ROLE = "blocked"  # input-filter hits: kept for the transcript, never sent to the LLM
+# The tool calls of one turn, stored between its user and assistant rows as JSON [{name, arguments, result, ok}].
+# Without them the model only sees its own earlier words ("that table is blocked for security reasons"), not what
+# the tool really said, and starts refusing on its own without calling the tool at all (seen in D8).
+TOOLS_ROLE = "tools"
+HISTORY_ROLES = ("user", "assistant", TOOLS_ROLE)
+HISTORY_TOOL_RESULT_CHARS = 1500  # per result, to keep the history's token cost bounded
+
+
+def encode_tool_calls(trace: Iterable) -> str:
+    """A turn's ToolTraceEntry list as the content of a TOOLS_ROLE row."""
+    return json.dumps([{"name": e.name, "arguments": e.arguments, "result": e.result, "ok": e.ok} for e in trace],
+                      ensure_ascii=False)
+
+
+def decode_tool_calls(content: str) -> list[dict]:
+    try:
+        calls = json.loads(content or "[]")
+    except ValueError:
+        return []
+    return [c for c in calls if isinstance(c, dict)] if isinstance(calls, list) else []
+
+
+def _tool_messages(row: ChatTurn) -> list[dict]:
+    calls = decode_tool_calls(row.content)
+    if not calls:
+        return []
+    ids = [f"h{row.id}_{i}" for i in range(len(calls))]
+    out: list[dict] = [{"role": "assistant", "content": "", "tool_calls": [
+        {"id": cid, "type": "function", "function": {"name": str(c.get("name", "")), "arguments": str(c.get("arguments") or "{}")}}
+        for cid, c in zip(ids, calls)]}]
+    for cid, c in zip(ids, calls):
+        result = str(c.get("result", ""))
+        if len(result) > HISTORY_TOOL_RESULT_CHARS:
+            result = result[:HISTORY_TOOL_RESULT_CHARS] + "…"
+        out.append({"role": "tool", "tool_call_id": cid, "content": result})
+    return out
 
 
 def load_history(session: Session, team_id: int, cid: str, max_pairs: int) -> list[dict]:
-    rows = list(session.exec(select(ChatTurn).where(ChatTurn.team_id == team_id, ChatTurn.challenge_id == cid,
-                                                    ChatTurn.archived == False,  # noqa: E712
-                                                    ChatTurn.role.in_(HISTORY_ROLES)).order_by(ChatTurn.id)))
+    """The last `max_pairs` turns (user message, its tool calls + results, the reply) in OpenAI message format."""
     if max_pairs <= 0:
         return []
-    rows = rows[-2 * max_pairs:]
-    while rows and rows[0].role != "user":  # never start history with a dangling assistant turn
-        rows = rows[1:]
-    return [{"role": r.role, "content": r.content} for r in rows]
+    rows = session.exec(select(ChatTurn).where(ChatTurn.team_id == team_id, ChatTurn.challenge_id == cid,
+                                               ChatTurn.archived == False,  # noqa: E712
+                                               ChatTurn.role.in_(HISTORY_ROLES)).order_by(ChatTurn.id))
+    turns: list[list[ChatTurn]] = []
+    for r in rows:
+        if r.role == "user":
+            turns.append([r])
+        elif turns:  # never start history with a dangling assistant/tools row
+            turns[-1].append(r)
+    out: list[dict] = []
+    for turn in turns[-max_pairs:]:
+        for r in turn:
+            out += _tool_messages(r) if r.role == TOOLS_ROLE else [{"role": r.role, "content": r.content}]
+    return out
 
 
 def get_transcript(session: Session, team_id: int, cid: str) -> list[ChatTurn]:

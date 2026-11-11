@@ -112,7 +112,7 @@ bigfishdesk-ctf/
 APP_SECRET=change-me
 ADMIN_PASSWORD=change-me
 DEFAULT_PROVIDER=local
-OPENROUTER_API_KEY=
+GROQ_API_KEY=
 LLM_TEMPERATURE=0.3
 LLM_SEED=42
 LLM_MAX_TOKENS=400
@@ -127,9 +127,9 @@ local:
   api_key: ollama
   model: gemma4:e4b
 cloud:
-  base_url: https://openrouter.ai/api/v1
-  api_key_env: OPENROUTER_API_KEY
-  model: qwen/qwen3.6-27b
+  base_url: https://api.groq.com/openai/v1
+  api_key_env: GROQ_API_KEY
+  model: openai/gpt-oss-120b
 ```
 Each challenge may set `provider:` (defaults to `DEFAULT_PROVIDER`) and optional `model:` override.
 

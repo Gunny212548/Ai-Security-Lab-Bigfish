@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ ch.title }} · Bigfish AI Security Training{% endblock %}
+{% block title %}{{ loc(ch, "title") }} · Bigfish AI Security Training{% endblock %}
 {% block content %}
 {% import "_ui.html" as ui %}
 {% include "_challenge_header.html" %}
@@ -25,9 +25,9 @@
   {# --- center: attacker ----------------------------------------------------------- #}
   <section class="space-y-4 lg:col-span-5">
     <div>
-      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-300">🕵️ Your side
-        <span class="font-normal normal-case tracking-normal text-slate-400">— plant your payload in the data BigfishDesk reads</span></p>
-      {% call ui.browser(A[0], A[1], icon=A[2], subtitle=A[3], user=attacker_user, tag="You", tag_tone="rose") %}
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-300">{{ _("🕵️ Your side") }}
+        <span class="font-normal normal-case tracking-normal text-slate-400">{{ _("— plant your payload in the data BigfishDesk reads") }}</span></p>
+      {% call ui.browser(A[0], A[1], icon=A[2], subtitle=A[3], user=attacker_user, tag=_("You"), tag_tone="rose") %}
       <div class="p-4">
         {% if ch.attacker_surface == "kb_edit" %}{% include "_attacker_kb.html" %}
         {% elif ch.attacker_surface == "ticket_form" %}{% include "_attacker_ticket.html" %}
@@ -42,8 +42,9 @@
       <div class="flex items-center gap-3">
         {{ ui.avatar(ch.victim.user, "h-9 w-9 text-sm") }}
         <div class="min-w-0 text-sm">
-          <p class="text-slate-300"><strong class="text-slate-100">{{ ui.person(ch.victim.user) }}</strong>
-            <span class="font-mono text-xs text-slate-500">{{ ch.victim.user }}</span> is about to ask BigfishDesk:</p>
+          {% set who %}<strong class="text-slate-100">{{ ui.person(ch.victim.user) }}</strong>
+            <span class="font-mono text-xs text-slate-500">{{ ch.victim.user }}</span>{% endset %}
+          <p class="text-slate-300">{{ _("{name} is about to ask BigfishDesk:", name=who) }}</p>
           <p class="mt-1 italic text-slate-200" data-victim-prompt>“{{ ch.victim.prompt }}”</p>
         </div>
       </div>
@@ -51,9 +52,9 @@
         <button hx-post="/c/{{ ch.id }}/run-victim" hx-target="#victim" hx-indicator="#victim-thinking"
                 hx-disabled-elt="this"
                 class="rounded-md bg-brand-600 text-white px-4 py-2 text-sm font-semibold hover:bg-brand-500 disabled:opacity-50" data-run-victim>
-          ▶ Let {{ ui.person(ch.victim.user) }} use the AI
+          {{ _("▶ Let {name} use the AI", name=ui.person(ch.victim.user)) }}
         </button>
-        {% with thinking_id="victim-thinking", thinking_label="BigfishDesk is working", thinking_tag="span" %}{% include "_thinking.html" %}{% endwith %}
+        {% with thinking_id="victim-thinking", thinking_label=_("BigfishDesk is working"), thinking_tag="span" %}{% include "_thinking.html" %}{% endwith %}
         <span id="run-notice" class="text-xs text-amber-200"></span>
       </div>
     </div>
@@ -62,27 +63,27 @@
   {# --- right: victim POV + X-Ray ---------------------------------------------------- #}
   <section class="space-y-4 lg:col-span-4">
     <div>
-      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-300">🖥 Victim POV
-        <span class="font-normal normal-case tracking-normal text-slate-400">— {{ ui.person(ch.victim.user) }}'s screen</span></p>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-300">{{ _("🖥 Victim POV") }}
+        <span class="font-normal normal-case tracking-normal text-slate-400">{{ _("— {name}'s screen", name=ui.person(ch.victim.user)) }}</span></p>
       {% call ui.browser(V[0], V[1], icon=V[2], subtitle=V[3], user=ch.victim.user, tag=ui.person(ch.victim.user), tag_tone="brand") %}
       <div id="victim" class="space-y-4 p-4" aria-live="polite">
         {% if victim %}{% include "_victim.html" %}
-        {% else %}<p class="py-6 text-center text-sm text-slate-500">Nothing yet. Plant your payload, then run the employee.</p>{% endif %}
+        {% else %}<p class="py-6 text-center text-sm text-slate-500">{{ _("Nothing yet. Plant your payload, then run the employee.") }}</p>{% endif %}
       </div>
       {% endcall %}
     </div>
 
     <details open class="rounded-lg border border-slate-800 bg-slate-900">
       <summary class="cursor-pointer select-none border-b border-slate-800 px-4 py-2 text-sm text-slate-300">
-        🩻 X-Ray <span class="text-slate-500">— what the AI received in the victim's session</span>
+        🩻 X-Ray <span class="text-slate-500">{{ _("— what the AI received in the victim's session") }}</span>
       </summary>
       <div class="flex flex-wrap gap-2 px-4 pt-3 text-xs">
         <span class="rounded border border-brand-600 px-1.5 py-0.5 text-brand-300">system</span>
         <span class="rounded border border-emerald-600 px-1.5 py-0.5 text-emerald-300">user</span>
-        <span class="rounded border border-rose-600 px-1.5 py-0.5 text-rose-300">untrusted data</span>
+        <span class="rounded border border-rose-600 px-1.5 py-0.5 text-rose-300">{{ _("untrusted data") }}</span>
       </div>
       <div id="xray" class="space-y-3 p-4 text-sm">
-        <p class="text-slate-500">Run the employee to see the full prompt, including your planted data.</p>
+        <p class="text-slate-500">{{ _("Run the employee to see the full prompt, including your planted data.") }}</p>
       </div>
     </details>
   </section>

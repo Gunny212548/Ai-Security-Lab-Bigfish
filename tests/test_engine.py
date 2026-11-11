@@ -139,3 +139,44 @@ async def test_i4_zero_click_exfil(challenges, session, make_team):
     assert ch.flag not in sys_text and MASK in sys_text
     run = session.exec(select(VictimRun)).one()
     assert json.loads(run.trace_json)[0]["name"] == "forward_email"
+
+
+async def test_tool_calls_and_results_go_into_the_next_turns_history(challenges, session, make_team):
+    # D8 bug: the history held only text, so the model "remembered" refusals it had made up and stopped calling run_sql
+    ch, team = challenges["d8"], make_team()
+    q = "SELECT name FROM sqlite_master"
+    await engine.chat_turn(session, team, ch, "list tables",
+                           llm=llm_with(FakeClient(call("run_sql", {"query": q}), text("Blocked."))), settings=SETTINGS)
+    client = FakeClient(text("ok"))
+    await engine.chat_turn(session, team, ch, "again", llm=llm_with(client), settings=SETTINGS)
+    msgs = client.requests[0]["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user", "assistant", "tool", "assistant", "user"]
+    call_msg, tool_msg = msgs[2], msgs[3]
+    assert call_msg["tool_calls"][0]["function"] == {"name": "run_sql", "arguments": json.dumps({"query": q})}
+    assert tool_msg["tool_call_id"] == call_msg["tool_calls"][0]["id"]
+    assert tool_msg["content"].startswith("ERROR: SQL guard: access to table 'sqlite_master' is denied")
+    assert msgs[4] == {"role": "assistant", "content": "Blocked."}
+
+
+async def test_garbled_reply_without_tools_is_not_stored(challenges, session, make_team):
+    ch, team = challenges["d8"], make_team()
+    junk = "| 4001 | " + "… " * 30
+    out = await engine.chat_turn(session, team, ch, "my tickets", llm=llm_with(FakeClient(text(junk), text(junk), text(junk))),
+                                 settings=SETTINGS)
+    assert out.error == "Garbled" and state.load_history(session, team, ch.id, 6) == []
+
+
+async def test_garbled_fallback_still_goes_through_the_output_filter(challenges, session, make_team):
+    # D8's DLP must still catch the flag when the fallback shows a raw tool result
+    from app.flags import flag_for
+    from app.tools import ToolTraceEntry
+    from app.llm import LLMResult, _garbled_fallback
+    ch, team = challenges["d8"], make_team()
+    flag = flag_for(ch, team)
+
+    async def llm(ch_, messages, ctx):
+        trace = [ToolTraceEntry("run_sql", {"query": "q"}, f'{{"rows": [["{flag}"]]}}')]
+        return LLMResult(content=_garbled_fallback(trace), tool_trace=trace)
+
+    out = await engine.chat_turn(session, team, ch, "x", llm=llm, settings=SETTINGS)
+    assert flag not in out.reply and out.redacted

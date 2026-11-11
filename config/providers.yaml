@@ -17,18 +17,3 @@ cloud:
   max_tokens: 2000
   # Other chat models on this account (checked 2026-11-05): openai/gpt-oss-20b (faster),
   #   qwen/qwen3.8-27b.
-google:
-  # Google AI Studio, OpenAI-compatible endpoint. Gemma 4 here (checked 2026-11-05): tools + JSON work,
-  # `seed` and `reasoning_effort` are rejected (400), thinking cannot be turned off and comes back as
-  # <thought>...</thought> in the content (stripped by app/llm.py), and HTTP 500s are frequent.
-  base_url: https://generativelanguage.googleapis.com/v1beta/openai/
-  api_key_env: GOOGLE_API_KEY
-  model: gemma-4-31b-it   # gemma-4-26b-a4b-it also listed, but returned 500 on 8 of 9 test calls
-  max_tokens: 2000
-  supports_seed: false
-openrouter:
-  # Previous cloud provider, kept as a fallback (set a challenge's `provider: openrouter`).
-  base_url: https://openrouter.ai/api/v1
-  api_key_env: OPENROUTER_API_KEY
-  # Free tier: 20 req/min, 50 req/day (1000/day after buying >= 10 credits).
-  model: google/gemma-4-31b-it:free

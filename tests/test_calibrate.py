@@ -89,13 +89,13 @@ def test_table_and_exit_status(challenges):
 
 
 def test_select_challenges_provider_override(challenges):
-    chosen = cal.select_challenges(challenges, ["d1", "i1"], "openrouter")
-    assert [c.id for c in chosen] == ["d1", "i1"] and all(c.provider == "openrouter" for c in chosen)
+    chosen = cal.select_challenges(challenges, ["d1", "i1"], "cloud")
+    assert [c.id for c in chosen] == ["d1", "i1"] and all(c.provider == "cloud" for c in chosen)
     with pytest.raises(SystemExit, match="unknown challenge"):
         cal.select_challenges(challenges, ["zz"], None)
     assert [c.id for c in cal.select_challenges(challenges, None, None)][:2] == ["d1", "d2"]
 
 
 def test_select_challenges_model_override(challenges):
-    chosen = cal.select_challenges(challenges, ["d1"], "openrouter", "m-x")
-    assert (chosen[0].provider, chosen[0].model) == ("openrouter", "m-x")
+    chosen = cal.select_challenges(challenges, ["d1"], "cloud", "m-x")
+    assert (chosen[0].provider, chosen[0].model) == ("cloud", "m-x")

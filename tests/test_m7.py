@@ -84,18 +84,36 @@ def test_prewarm_targets_and_missing_key(monkeypatch, capsys):
     assert sorted(c for cids in used.values() for c in cids) == sorted(ACTIVE_IDS)
     assert len(prewarm.targets(s, providers, every=True)) >= len(providers)
 
-    async def fake_ping(provider, model, settings):
+    async def fake_ping(provider, model, settings, api_key=None):
         return True, 0.1, "OK"
 
     monkeypatch.setattr(prewarm, "ping", fake_ping)
     monkeypatch.setattr(prewarm, "get_settings", lambda: s.model_copy(update={
-        "groq_api_key": "", "google_api_key": "", "openrouter_api_key": ""}))
-    for env in ("GROQ_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"):
-        monkeypatch.delenv(env, raising=False)
+        "groq_api_key": ""}))
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     code = asyncio.run(prewarm.main(["--all"]))
     out = capsys.readouterr().out
     assert code == 1 and "GROQ_API_KEY is not set" in out and "FAIL" in out
     assert "local" in out and "OK" in out
+
+
+def test_prewarm_pings_every_key(monkeypatch, capsys):
+    from app.settings import get_settings
+
+    pinged = []
+
+    async def fake_ping(provider, model, settings, api_key=None):
+        pinged.append((provider.name, api_key))
+        return api_key != "k2", 0.1, "OK" if api_key != "k2" else "RateLimitError"
+
+    s = get_settings().model_copy(update={"default_provider": "cloud", "groq_api_key": "k1,k2,k3"})
+    monkeypatch.setattr(prewarm, "ping", fake_ping)
+    monkeypatch.setattr(prewarm, "get_settings", lambda: s)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    code = asyncio.run(prewarm.main([]))
+    out = capsys.readouterr().out
+    assert [k for n, k in pinged if n == "cloud"] == ["k1", "k2", "k3"]
+    assert code == 1 and "cloud#2" in out and "k1" not in out  # labels, never the keys
 
 
 def test_queue_poll_does_not_inherit_the_chat_form(client):

@@ -118,3 +118,25 @@ def test_history_keeps_last_pairs_and_skips_blocked(session, make_team):
     assert [m["content"] for m in h] == ["u7", "a7", "u8", "a8", "u9", "a9"]
     assert all(m["role"] in ("user", "assistant") for m in state.load_history(session, team, "d1", 50))
     assert state.load_history(session, team, "d1", 0) == []
+
+
+def test_history_counts_turns_not_rows_and_replays_tool_calls(session, make_team):
+    team = make_team()
+    tools = json.dumps([{"name": "run_sql", "arguments": '{"query": "q"}', "result": "x" * 5000, "ok": True}])
+    state.add_chat_turns(session, team, "d8", [
+        ("assistant", "dangling"),
+        ("user", "u0"), ("assistant", "a0"),
+        ("user", "u1"), (state.TOOLS_ROLE, tools), ("assistant", "a1"),
+        ("user", "u2"), ("assistant", "a2"),
+    ])
+    h = state.load_history(session, team, "d8", 2)
+    assert [m["role"] for m in h] == ["user", "assistant", "tool", "assistant", "user", "assistant"]
+    assert h[1]["tool_calls"][0]["function"]["name"] == "run_sql"
+    assert len(h[2]["content"]) == state.HISTORY_TOOL_RESULT_CHARS + 1
+    assert [m["content"] for m in state.load_history(session, team, "d8", 50)][0] == "u0"
+
+
+def test_bad_tools_row_is_skipped(session, make_team):
+    team = make_team()
+    state.add_chat_turns(session, team, "d8", [("user", "u"), (state.TOOLS_ROLE, "not json"), ("assistant", "a")])
+    assert [m["role"] for m in state.load_history(session, team, "d8", 6)] == ["user", "assistant"]

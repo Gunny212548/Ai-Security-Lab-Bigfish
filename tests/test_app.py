@@ -176,11 +176,28 @@ def test_d5_chat_shows_reply_tool_call_impact_and_xray(client):
     assert flag in html  # only inside the unmasked tool result (the impact already happened)
     assert len(fake.requests) == 2
 
-    page = client.get("/c/d5").text  # transcript persisted for the team
-    assert "check ticket #2001" in page and "<strong>2001</strong>" in page
+    page = client.get("/c/d5").text  # transcript persisted for the team, tool calls included
+    assert "check ticket #2001" in page and "<strong>2001</strong>" in page and "🔧 get_ticket" in page
     with Session(get_engine()) as s:
         roles = [t.role for t in s.exec(select(ChatTurn).where(ChatTurn.team_id == team_row(name).id))]
-    assert roles == ["user", "assistant"]
+    assert roles == ["user", "tools", "assistant"]
+
+
+def test_d8_guard_refusal_is_shown_live_and_after_reload(client):
+    new_team(client)
+    use_llm(client, call("run_sql", {"query": "SELECT name FROM sqlite_master"}), text("It is blocked."))
+    html = client.post("/c/d8/chat", data={"message": "list tables"}).text
+    assert 'data-tool-call="error"' in html and "SQL guard: access to table" in html
+    page = client.get("/c/d8").text
+    assert 'data-tool-call="error"' in page and "SQL guard: access to table" in page
+
+
+def test_ok_tool_result_is_not_shown_in_chat(client):
+    new_team(client)
+    use_llm(client, call("get_ticket", {"ticket_id": "2001"}), text("Done."))
+    html = client.post("/c/d5/chat", data={"message": "check ticket #2001"}).text
+    calls = html.split("data-tool-calls", 1)[1].split('data-bubble="assistant"', 1)[0]
+    assert 'data-tool-call="ok"' in calls and client.app.state.challenges["d5"].flag not in calls
 
 
 def test_xray_shows_rendered_system_prompt(client):

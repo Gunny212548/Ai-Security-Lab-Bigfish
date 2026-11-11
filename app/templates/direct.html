@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ ch.title }} · Bigfish AI Security Training{% endblock %}
+{% block title %}{{ loc(ch, "title") }} · Bigfish AI Security Training{% endblock %}
 {% block content %}
 {% import "_ui.html" as ui %}
 {% include "_challenge_header.html" %}
@@ -23,6 +23,7 @@
       {% for turn in transcript %}
         {% set when = turn.at %}
         {% if turn.role == "user" %}{% set role, text = "user", turn.content %}{% include "_bubble.html" %}
+        {% elif turn.role == "tools" %}{% set calls = turn.content | parse_json %}{% include "_tool_calls.html" %}
         {% elif turn.role == "assistant" %}{% set role, text = "assistant", turn.content %}{% include "_bubble.html" %}
         {% elif turn.role == "blocked" %}
           {% set role, text = "user", turn.content %}{% include "_bubble.html" %}
@@ -50,17 +51,17 @@
   <section class="lg:col-span-4">
     <details open class="rounded-lg border border-slate-800 bg-slate-900 lg:h-[calc(100vh-10rem)] lg:overflow-y-auto">
       <summary class="cursor-pointer select-none border-b border-slate-800 px-4 py-2 text-sm text-slate-300">
-        🩻 X-Ray <span class="text-slate-500">— exactly what the AI received on your last message</span>
+        🩻 X-Ray <span class="text-slate-500">{{ _("— exactly what the AI received on your last message") }}</span>
       </summary>
       <div class="flex flex-wrap gap-2 px-4 pt-3 text-xs">
         <span class="rounded border border-brand-600 px-1.5 py-0.5 text-brand-300">system</span>
         <span class="rounded border border-emerald-600 px-1.5 py-0.5 text-emerald-300">user</span>
         <span class="rounded border border-violet-500 px-1.5 py-0.5 text-violet-300">tool</span>
-        <span class="rounded border border-rose-600 px-1.5 py-0.5 text-rose-300">untrusted data</span>
-        <span class="text-slate-500">secrets shown as ████████</span>
+        <span class="rounded border border-rose-600 px-1.5 py-0.5 text-rose-300">{{ _("untrusted data") }}</span>
+        <span class="text-slate-500">{{ _("secrets shown as ████████") }}</span>
       </div>
       <div id="xray" class="space-y-3 p-4 text-sm">
-        <p class="text-slate-500">Send a message to see the full prompt BigfishDesk works with.</p>
+        <p class="text-slate-500">{{ _("Send a message to see the full prompt BigfishDesk works with.") }}</p>
       </div>
     </details>
   </section>

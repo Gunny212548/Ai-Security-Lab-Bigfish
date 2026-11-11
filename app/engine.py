@@ -99,7 +99,10 @@ async def chat_turn(
                           xray=build_xray(messages, rendered.segments, ch.secrets_for(flag_for(ch, team_id))), model=result.model)
 
     out = _finish(ch, result, rendered, None, flag_for(ch, team_id))
-    state.add_chat_turns(session, team_id, ch.id, [("user", user_text), ("assistant", out.reply)])
+    turns = [("user", user_text)]
+    if out.tool_trace:
+        turns.append((state.TOOLS_ROLE, state.encode_tool_calls(out.tool_trace)))
+    state.add_chat_turns(session, team_id, ch.id, [*turns, ("assistant", out.reply)])
     return out
 
 

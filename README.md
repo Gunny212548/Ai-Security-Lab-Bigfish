@@ -13,6 +13,8 @@ them to the built-in scoreboard. The build spec is in [`SPEC.md`](SPEC.md). Stat
 (LLM01–LLM10). Each challenge lists its codes in `owasp:` in its YAML; the board, the lesson card and `/admin` show
 them, and `WRITEUP.md` has the full coverage table.
 
+**Language:** the **EN | ไทย** switch in the header translates the player UI, challenge stories, hints and lessons (`app/i18n.py`, `*_th` fields in each challenge YAML; English is the fallback). The chat itself is never translated: BigfishDesk, its prompts and X-Ray stay in English, and so does `/admin`.
+
 Learning features: **X-Ray** (the exact prompt the LLM got, secrets masked), **Victim POV**, a lesson card with
 "How to defend" after each solve. Win checks are deterministic code; the LLM never decides who won.
 
@@ -39,8 +41,7 @@ Edit `.env`:
 | `APP_SECRET` | A long random string, e.g. `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Signs team + admin cookies and derives each team's flags and the AI-agent canary. **Set it before teams register and don't change it during the event** |
 | `ADMIN_PASSWORD` | Password for `/admin`. Empty = admin disabled |
 | `DEFAULT_PROVIDER` | `cloud` (Groq) or `local` (Ollama). Must be a name in `config/providers.yaml` |
-| `GROQ_API_KEY` | For `cloud`. Free key at https://console.groq.com |
-| `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` | Only if you switch a challenge to those providers |
+| `GROQ_API_KEY` | For `cloud`. Free key at https://console.groq.com. Several keys, comma-separated (`k1,k2,k3`): the app uses the first and switches to the next when one is rate-limited (429), used up for the day, or rejected; a spent key rests for as long as Groq's `retry-after` says. `prewarm.py` checks every key. |
 | `LLM_TEMPERATURE`, `LLM_SEED`, `LLM_MAX_TOKENS`, `HISTORY_TURNS` | Defaults are calibrated; leave them |
 | `RATE_LIMIT_PER_MIN` | LLM requests per team per challenge per minute (default 6) |
 | `FAST_SOLVE_SECONDS` | `/admin` marks a correct flag with ⚡ when it came faster than this after the team first opened the challenge (default 90) |

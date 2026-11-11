@@ -6,14 +6,7 @@
 {% elif out.error %}
   {% set role, text = "error", out.reply %}{% include "_bubble.html" %}
 {% else %}
-  {% if out.tool_trace %}
-  <div class="ml-10 space-y-1" data-tool-calls>
-    {% for e in out.tool_trace %}
-    <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">BigfishDesk used
-      <code class="rounded border border-violet-500/40 bg-violet-950/40 px-1.5 py-0.5 font-mono text-violet-200">🔧 {{ e.name }}({{ e.raw_args or e.args | tojson }})</code></p>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {% set calls = out.tool_trace %}{% include "_tool_calls.html" %}
   {% set role, text = ("redacted" if out.redacted else "assistant"), out.reply %}{% include "_bubble.html" %}
 {% endif %}
 

@@ -38,6 +38,11 @@ class ToolTraceEntry:
     ok: bool = True
     raw_args: str = ""
 
+    @property
+    def arguments(self) -> str:
+        """The arguments as the model sent them (JSON text)."""
+        return self.raw_args or json.dumps(self.args, ensure_ascii=False)
+
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "args": self.args, "result": self.result, "ok": self.ok}
 

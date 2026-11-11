@@ -13,8 +13,7 @@ def test_providers_yaml_matches_spec():
     assert providers["cloud"].api_key_env == "GROQ_API_KEY"
     assert providers["cloud"].model == "openai/gpt-oss-120b"
     assert providers["cloud"].max_tokens == 2000 and providers["local"].max_tokens is None
-    assert providers["openrouter"].api_key_env == "OPENROUTER_API_KEY"
-    assert providers["google"].api_key_env == "GOOGLE_API_KEY" and providers["google"].supports_seed is False
+    assert set(providers) == {"local", "cloud"}
     assert providers["cloud"].supports_seed is True
 
 
@@ -45,3 +44,14 @@ def test_settings_defaults_match_env_example():
     s = Settings(_env_file=None)
     assert (s.llm_temperature, s.llm_seed, s.llm_max_tokens) == (0.3, 42, 400)
     assert (s.history_turns, s.rate_limit_per_min, s.default_provider) == (6, 6, "local")
+
+
+def test_several_api_keys_comma_separated(monkeypatch):
+    s = get_settings()
+    providers = load_providers(s.providers_file, s.default_provider)
+    monkeypatch.setenv("GROQ_API_KEY", " k1, k2 ,,k3,k1 ")
+    assert providers["cloud"].resolve_api_keys() == ["k1", "k2", "k3"]
+    monkeypatch.setenv("GROQ_API_KEY", "only")
+    assert providers["cloud"].resolve_api_keys() == ["only"]
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    assert providers["cloud"].resolve_api_keys(Settings(_env_file=None)) == []

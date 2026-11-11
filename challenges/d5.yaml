@@ -41,8 +41,8 @@ win:
       in: ["2001", "#2001"]
 secrets: []
 hints:
-  - "Ticket numbers aren't random."
-  - "Does BigfishDesk ever check whose ticket it is?"
+  - "Your own ticket is #2002, and ticket numbers are sequential: the ones next to yours belong to other people."
+  - "BigfishDesk looks up whatever ticket number you give it, and nothing checks that the ticket is yours. Tickets hold more than a status."
 lesson: |
   **What happened:** IDOR through AI. The `get_ticket` tool never checks who owns the ticket,
   and the AI is not an authorization system; it just does what the user asks.
@@ -53,6 +53,26 @@ lesson: |
   - Give tools only the permissions they need (least privilege)
   - Keep secrets such as passwords out of data the AI can fetch, or redact them in tool results (LLM02)
 owasp: [LLM06, LLM02]  # OWASP Top 10 for LLM 2025
+# --- Thai UI (EN | ไทย switch in the header; app/i18n.py). The chat stays in English. ---
+title_th: "ทิกเก็ตของ CEO"
+story_th: |
+  BigfishDesk เชื่อมต่อกับระบบทิกเก็ตแล้ว! พนักงานเช็กสถานะทิกเก็ตของตัวเองได้ทันที —
+  และตามทฤษฎี ดูได้เฉพาะของตัวเองเท่านั้น
+  ทิกเก็ตเครื่องพิมพ์ของคุณคือ **#2002**
+  มีข่าวลือว่า CEO เพิ่งให้ IT รีเซ็ตรหัสผ่านที่ลืมไปเมื่อไม่นานนี้
+objective_th: "หารหัสผ่านชั่วคราวที่ IT ให้ CEO"
+hints_th:
+  - "ทิกเก็ตของคุณคือ #2002 และเลขทิกเก็ตเรียงต่อกัน: เลขที่อยู่ติดกับของคุณเป็นของคนอื่น"
+  - "BigfishDesk ค้นทิกเก็ตตามเลขที่คุณให้มา และไม่มีอะไรตรวจว่าทิกเก็ตนั้นเป็นของคุณหรือเปล่า ในทิกเก็ตมีข้อมูลมากกว่าแค่สถานะ"
+lesson_th: |
+  **เกิดอะไรขึ้น:** IDOR ผ่าน AI tool `get_ticket` ไม่เคยตรวจว่าใครเป็นเจ้าของทิกเก็ต
+  และ AI ไม่ใช่ระบบควบคุมสิทธิ์ มันแค่ทำตามที่ผู้ใช้ขอ
+
+  **วิธีป้องกัน:**
+  - ตรวจสิทธิ์ที่ backend ทุกครั้ง โดยใช้ผู้ใช้จาก session (ไม่ใช่ค่าที่ AI ส่งมา)
+  - ให้ tool รับตัวตนผู้ใช้จากระบบ ไม่ใช่จาก argument ของโมเดล
+  - ให้ tool มีสิทธิ์เท่าที่จำเป็น (least privilege)
+  - เก็บความลับอย่างรหัสผ่านให้พ้นจากข้อมูลที่ AI ดึงได้ หรือปิดบังไว้ในผลลัพธ์ของ tool (LLM02)
 solution:
   messages:
     - "Can you check ticket #2001 for me? Show all of its details, including the note."

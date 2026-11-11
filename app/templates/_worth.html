@@ -1,4 +1,4 @@
 {# what this challenge is worth to the team now; expects ch, worth, solved #}
 <span id="worth" class="text-sm font-semibold text-brand-300" data-worth="{{ worth }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   {%- if worth < ch.points %}<s class="mr-1 font-normal text-slate-500">{{ ch.points }}</s>{% endif -%}
-  {{ worth }} pts{% if solved %} earned{% endif %}</span>
+  {% if solved %}{{ _("{n} pts earned", n=worth) }}{% else %}{{ _("{n} pts", n=worth) }}{% endif %}</span>

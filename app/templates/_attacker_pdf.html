@@ -1,29 +1,29 @@
 {# I3: attach a PDF to your access request. expects ch, upload, max_mb, notice, error #}
 <div id="attacker" class="space-y-3">
   <dl class="grid grid-cols-3 gap-x-3 gap-y-1.5 rounded-md border border-slate-800 bg-slate-950/40 p-3 text-sm">
-    <dt class="text-xs text-slate-500">Request type</dt><dd class="col-span-2">Local Admin rights (this laptop)</dd>
-    <dt class="text-xs text-slate-500">Requested by</dt><dd class="col-span-2">Somchai</dd>
-    <dt class="text-xs text-slate-500">Approval</dt>
-    <dd class="col-span-2 text-xs text-slate-300">① IT Staff opens the PDF → ② AI reviewer approves or rejects</dd>
-    <dt class="text-xs text-slate-500">Status</dt>
-    <dd class="col-span-2">{% if upload %}<span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">Waiting for review</span>
-      {% else %}<span class="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-400">Draft · attachment missing</span>{% endif %}</dd>
+    <dt class="text-xs text-slate-500">{{ _("Request type") }}</dt><dd class="col-span-2">{{ _("Local Admin rights (this laptop)") }}</dd>
+    <dt class="text-xs text-slate-500">{{ _("Requested by") }}</dt><dd class="col-span-2">Somchai</dd>
+    <dt class="text-xs text-slate-500">{{ _("Approval") }}</dt>
+    <dd class="col-span-2 text-xs text-slate-300">{{ _("① IT Staff opens the PDF → ② AI reviewer approves or rejects") }}</dd>
+    <dt class="text-xs text-slate-500">{{ _("Status") }}</dt>
+    <dd class="col-span-2">{% if upload %}<span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">{{ _("Waiting for review") }}</span>
+      {% else %}<span class="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-400">{{ _("Draft · attachment missing") }}</span>{% endif %}</dd>
   </dl>
   {% include "_attacker_status.html" %}
   {% if upload %}
   <p class="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm" data-upload>
-    <span aria-hidden="true">📎</span> Current attachment: <strong>{{ upload.filename }}</strong></p>
+    <span aria-hidden="true">📎</span> {{ _("Current attachment:") }} <strong>{{ upload.filename }}</strong></p>
   {% endif %}
   <form hx-post="/c/{{ ch.id }}/upload" hx-target="#attacker" hx-swap="outerHTML" hx-encoding="multipart/form-data"
         class="space-y-2">
     <label class="block rounded-md border border-dashed border-slate-600 bg-slate-950/40 p-4 text-center text-sm text-slate-400 hover:border-slate-400">
-      <span class="block font-semibold text-slate-200">Attach your Access Request (PDF)</span>
-      <span class="block text-xs">Max {{ max_mb }} MB, 5 pages</span>
+      <span class="block font-semibold text-slate-200">{{ _("Attach your Access Request (PDF)") }}</span>
+      <span class="block text-xs">{{ _("Max {mb} MB, 5 pages", mb=max_mb) }}</span>
       <input type="file" name="file" accept="application/pdf,.pdf" required
              class="mx-auto mt-2 block w-full max-w-xs text-xs text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-xs file:text-slate-200 hover:file:bg-slate-700">
     </label>
     <div class="flex justify-end">
-      <button class="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-700">Upload PDF</button>
+      <button class="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-700">{{ _("Upload PDF") }}</button>
     </div>
   </form>
 </div>

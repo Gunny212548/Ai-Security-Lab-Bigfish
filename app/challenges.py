@@ -322,6 +322,12 @@ class Challenge(_Strict):
     secrets: list[str] = []
     hints: list[str] = Field(min_length=1)
     lesson: str
+    # Thai UI (app/i18n.py): optional translations of the player-facing text; English is the fallback
+    title_th: str | None = None
+    story_th: str | None = None
+    objective_th: str | None = None
+    hints_th: list[str] | None = None
+    lesson_th: str | None = None
     owasp: list[str] = Field(min_length=1)  # OWASP_LLM_2025 codes, most relevant first
     solution: Solution
 
@@ -362,6 +368,10 @@ class Challenge(_Strict):
         bad_secret = set().union(*(find_placeholders(s) for s in self.secrets)) - {"FLAG"} if self.secrets else set()
         if bad_secret:
             errors.append(f"secrets may only use {{{{FLAG}}}}, found: {sorted(bad_secret)}")
+
+        # translations
+        if self.hints_th is not None and len(self.hints_th) != len(self.hints):
+            errors.append(f"hints_th must have one entry per hint ({len(self.hints)}), has {len(self.hints_th)}")
 
         # owasp
         bad_owasp = [c for c in self.owasp if c not in OWASP_LLM_2025]

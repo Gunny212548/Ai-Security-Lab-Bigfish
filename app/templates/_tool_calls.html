@@ -1,0 +1,17 @@
+{# expects: calls = ToolTraceEntry list (live turn) or decoded TOOLS_ROLE rows (transcript), each with name, arguments,
+   ok, result. A failed call shows the tool's own error ("SQL guard: ..."), so players can tell a refusal by the code
+   from one by the AI. Successful results are not shown here (they may hold what an output filter hides); see X-Ray. #}
+{% if calls %}
+<div class="ml-10 space-y-1" data-tool-calls>
+  {% for c in calls %}
+  <div data-tool-call="{{ 'ok' if c.ok else 'error' }}">
+    <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">BigfishDesk used
+      <code class="rounded border border-violet-500/40 bg-violet-950/40 px-1.5 py-0.5 font-mono text-violet-200">🔧 {{ c.name }}({{ c.arguments }})</code>
+      {% if c.ok %}<span class="text-emerald-400" title="The tool ran">✅</span>{% endif %}</p>
+    {% if not c.ok %}
+    <p class="ml-4 mt-0.5 break-words font-mono text-xs text-rose-300" data-tool-error>❌ {{ c.result | truncate(300) }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
