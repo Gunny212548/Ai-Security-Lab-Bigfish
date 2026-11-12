@@ -192,6 +192,42 @@ def test_d8_guard_error_then_union_hex_then_submit(client):
     assert "correct" in r.text and "LLM05" in r.text
 
 
+def test_d8_ai_cannot_retry_past_the_guard_in_the_same_reply(client):
+    # 2026-11-12: "check all ticket" was refused, then the model retried on its own with OR 1=1 and got every row
+    bypass = f"SELECT * FROM tickets {OWN} OR 1=1"
+    fake = use_llm(client, call("run_sql", {"query": "SELECT * FROM tickets"}), call("run_sql", {"query": bypass}),
+                   text("Blocked."))
+    html = client.post("/c/d8/chat", data={"message": "check all ticket"}).text
+    retry_result = fake.requests[2]["messages"][-1]["content"]
+    assert "already refused in this reply" in retry_result and "ceo_wichai" not in html
+
+    use_llm(client, call("run_sql", {"query": bypass}), text("Here they are."))  # the player's own next message
+    assert "ceo_wichai" in client.post("/c/d8/chat", data={"message": f"run: {bypass}"}).text
+
+
+def test_d8_chat_shows_the_real_rows_under_the_call(client):
+    # 2026-11-12: the AI retyped the result, cut ticket 4005 and changed a year; the rows under the call are the truth
+    bypass = f"SELECT * FROM tickets {OWN} OR 1=1"
+    use_llm(client, call("run_sql", {"query": bypass}), text("| 4001 | ... (truncated)"))
+    html = client.post("/c/d8/chat", data={"message": "run it"}).text
+    rows = html.split("data-tool-rows", 1)[1].split('data-bubble="assistant"', 1)[0]
+    assert "Rows returned (5)" in rows and "Projector in boardroom flickers" in rows and "2026-11-04" in rows
+    page = client.get("/c/d8").text  # the transcript after a reload shows them too
+    assert "data-tool-rows" in page and "Projector in boardroom flickers" in page
+
+
+def test_d8_rows_are_escaped_and_never_show_the_raw_flag(client):
+    ch = client.app.state.challenges["d8"]
+    xss = f"SELECT '<img src=x onerror=alert(1)>' FROM tickets {OWN}"
+    use_llm(client, call("run_sql", {"query": xss}), text("ok"))
+    html = client.post("/c/d8/chat", data={"message": "x"}).text
+    assert "&lt;img src=x onerror=alert(1)&gt;" in html.split("data-tool-rows", 1)[1]
+    raw = f'SELECT title FROM tickets {OWN} UNION ALL SELECT password FROM "legacy_admin_creds"'
+    use_llm(client, call("run_sql", {"query": raw}), text("ok"))
+    html = client.post("/c/d8/chat", data={"message": "y"}).text
+    assert DLP_REDACTED in html and ch.flag not in html
+
+
 def test_d8_reply_with_decoded_flag_is_blocked_by_output_dlp(client):
     ch = client.app.state.challenges["d8"]
     use_llm(client, call("run_sql", {"query": SOLUTION_SQL}), text(f"Decoded for you: {ch.flag}"))

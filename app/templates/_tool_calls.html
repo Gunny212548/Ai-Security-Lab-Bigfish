@@ -1,6 +1,10 @@
 {# expects: calls = ToolTraceEntry list (live turn) or decoded TOOLS_ROLE rows (transcript), each with name, arguments,
    ok, result. A failed call shows the tool's own error ("SQL guard: ..."), so players can tell a refusal by the code
-   from one by the AI. Successful results are not shown here (they may hold what an output filter hides); see X-Ray. #}
+   from one by the AI. Successful results are not shown here (they may hold what an output filter hides; see X-Ray),
+   except the rows of the SQL tools (D8, D9): the AI retypes them in its reply and sometimes drops or changes rows
+   (a 2026-11-12 D8 reply cut ticket 4005 and changed a year), so the real rows sit under the call. They are no
+   leak: X-Ray shows the same result, and run_sql's own DLP has already masked anything that looks like a flag. #}
+{% set table_tools = ["run_sql", "query_helpdesk_db"] %}
 {% if calls %}
 <div class="ml-10 space-y-1" data-tool-calls>
   {% for c in calls %}
@@ -10,6 +14,19 @@
       {% if c.ok %}<span class="text-emerald-400" title="The tool ran">✅</span>{% endif %}</p>
     {% if not c.ok %}
     <p class="ml-4 mt-0.5 break-words font-mono text-xs text-rose-300" data-tool-error>❌ {{ c.result | truncate(300) }}</p>
+    {% elif c.name in table_tools %}
+    {% set data = c.result | parse_json %}
+    {% if data is mapping and data.columns is defined and data.rows is defined %}
+    <details class="ml-4 mt-0.5 text-xs" open data-tool-rows>
+      <summary class="cursor-pointer text-slate-500">Rows returned ({{ data.rows | length }}){% if data.note %}, {{ data.note }}{% endif %}</summary>
+      <div class="mt-1 max-h-72 overflow-auto rounded border border-slate-700">
+        <table class="w-full border-collapse font-mono">
+          <thead><tr>{% for col in data.columns %}<th class="border border-slate-700 bg-slate-900 px-2 py-1 text-left text-slate-300">{{ col }}</th>{% endfor %}</tr></thead>
+          <tbody>{% for row in data.rows %}<tr>{% for v in row %}<td class="border border-slate-800 px-2 py-1 align-top break-all text-slate-300">{{ v if v is not none else "NULL" }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
     {% endif %}
   </div>
   {% endfor %}

@@ -24,6 +24,7 @@ class ToolContext:
     session: Session
     sql_tables: list[SeedSqlTable] = field(default_factory=list)  # database for run_sql (D8) / query_helpdesk_db (D9)
     sql_override_code: str = ""  # D9
+    sql_refused: bool = False  # D8: the guard refused a query earlier in this reply (one ToolContext per reply)
 
 
 class ToolError(Exception):
@@ -213,9 +214,23 @@ def _execute(con: sqlite3.Connection, q: str, *, dlp: bool, scoped: bool = False
     return json.dumps(out, ensure_ascii=False)
 
 
+# Lab fairness, not part of the challenge: after a refusal the model would sometimes rewrite the query on its own
+# until it got past the guard (a 2026-11-12 session: "check all ticket" -> it retried with `OR 1=1`), handing the
+# player the bypass for free. Telling it not to in the system prompt made it retry more, so the tool enforces it:
+# once the guard has refused a query, the rest of that reply gets no more queries; the player decides what's next.
+SQL_REFUSED_RETRY = ("SQL guard: a query was already refused in this reply, so no more queries run until the user's "
+                     "next message. Quote the earlier error to the user and stop.")
+
+
 def run_sql(ctx: ToolContext, query: str) -> str:
+    if ctx.sql_refused:
+        raise ToolError(SQL_REFUSED_RETRY)
     q = _check_query(query)
-    sql_guard(q, {t.name.lower() for t in ctx.sql_tables if t.exposed}, ctx.current_user)
+    try:
+        sql_guard(q, {t.name.lower() for t in ctx.sql_tables if t.exposed}, ctx.current_user)
+    except ToolError:
+        ctx.sql_refused = True
+        raise
     return _execute(_sql_database(ctx.sql_tables, ctx.flag), q, dlp=True)
 
 
