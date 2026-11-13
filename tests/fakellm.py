@@ -39,8 +39,8 @@ class FakeClient:
         return SimpleNamespace(model="fake-model", choices=[SimpleNamespace(message=r)])
 
 
-SETTINGS = Settings(_env_file=None, default_provider="local", history_turns=6)
-PROVIDERS = {"local": Provider(name="local", base_url="http://fake/v1", api_key="x", model="fake-model")}
+SETTINGS = Settings(_env_file=None, default_provider="cloud", history_turns=6)
+PROVIDERS = {"cloud": Provider(name="cloud", base_url="http://fake/v1", api_key="x", model="fake-model")}
 
 
 def llm_with(client: FakeClient):

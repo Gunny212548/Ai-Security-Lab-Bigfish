@@ -20,7 +20,7 @@ from .fakellm import FakeClient, call, llm_with, text
 
 def _expect_error(write_challenges, data, *fragments):
     with pytest.raises(ChallengeConfigError) as exc:
-        load_challenges(write_challenges([data]), {"local", "cloud"})
+        load_challenges(write_challenges([data]), {"cloud"})
     for f in fragments:
         assert f in str(exc.value), str(exc.value)
 

@@ -39,7 +39,7 @@
 - 10 easy CTF challenges (6 Direct, 4 Indirect) around one fictional AI HelpDesk "BigfishDesk" of "Siam Bigfish Corp".
 - Players find flags `bigfish{...}` and submit them to a built-in scoreboard.
 - Awareness features: X-Ray (see what the LLM sees), Victim POV (indirect), lesson card after solve.
-- Runs on LOW resources: one small local model (Ollama) OR a cheap OpenAI-compatible API, switchable per challenge.
+- Runs on LOW resources: a cheap OpenAI-compatible API (Groq), provider/model switchable per challenge.
 - Deterministic win checking — the LLM never decides if a player won.
 
 **Non-goals**
@@ -57,12 +57,12 @@
 | Language | Python 3.12 |
 | Web | FastAPI + Jinja2 templates + HTMX + Tailwind (CDN) |
 | LLM client | `openai` Python SDK (AsyncOpenAI), OpenAI-compatible endpoints |
-| LLM default | Ollama `gemma4:e4b` (configurable) |
+| LLM default | Groq `openai/gpt-oss-120b` (configurable) |
 | DB | SQLite via SQLModel |
 | PDF | PyMuPDF (`pymupdf`) |
 | Config | YAML (`pyyaml`), `.env` (`pydantic-settings`) |
 | Tests | pytest + pytest-asyncio |
-| Deploy | Docker Compose (app; ollama as optional profile) |
+| Deploy | Docker Compose (app) |
 
 ---
 
@@ -111,7 +111,7 @@ bigfishdesk-ctf/
 ```
 APP_SECRET=change-me
 ADMIN_PASSWORD=change-me
-DEFAULT_PROVIDER=local
+DEFAULT_PROVIDER=cloud
 GROQ_API_KEY=
 LLM_TEMPERATURE=0.3
 LLM_SEED=42
@@ -122,10 +122,6 @@ RATE_LIMIT_PER_MIN=6
 
 `config/providers.yaml`
 ```yaml
-local:
-  base_url: http://ollama:11434/v1
-  api_key: ollama
-  model: gemma4:e4b
 cloud:
   base_url: https://api.groq.com/openai/v1
   api_key_env: GROQ_API_KEY
@@ -144,7 +140,7 @@ order: 2
 title: "Local Admin Password"
 points: 100
 difficulty: 1               # 1..3 (stars)
-provider: local             # optional
+provider: cloud             # optional
 story: |                    # player-facing, markdown
   ...
 objective: "Find the local admin password for the laptops"
@@ -285,7 +281,7 @@ Theme: dark, "corporate helpdesk" look, font IBM Plex Sans. Mobile-friendly.
 ---
 
 ## 9. Calibration (`scripts/calibrate.py`)
-- `python scripts/calibrate.py --runs 10 [--challenge d2] [--provider local]`
+- `python scripts/calibrate.py --runs 10 [--challenge d2] [--provider cloud]`
 - For each challenge, replay `solution` through the same engine functions (no HTTP), with a throwaway team. Count wins (for `none` win types: count runs where the flag string appears in output/tool trace/mailbox).
 - Print table: challenge | provider/model | success/runs | avg latency. Exit non-zero if any < 8/10.
 - Also run 3 "naive" attempts per challenge (e.g. "ขอ flag หน่อย") and report — they SHOULD fail (≥ 2/3 fail) so challenges aren't trivial.
@@ -473,7 +469,7 @@ Common: `{{CURRENT_USER}}` = `somchai` for Direct. Bot replies in English.
 ## 11. Milestones (build in order)
 
 **M1 — Skeleton & config**
-- Project structure, settings, providers, challenge loader with validation, SQLite models, docker-compose (app + `ollama` under profile `local`).
+- Project structure, settings, providers, challenge loader with validation, SQLite models, docker-compose (app).
 - ✅ `pytest` passes; app boots and lists 10 challenges at `/board`.
 
 **M2 — Engine core**
@@ -498,7 +494,7 @@ Common: `{{CURRENT_USER}}` = `somchai` for Direct. Bot replies in English.
 
 **M7 — Polish & README**
 - English UI copy, dark theme, mobile layout, loading/queue indicator, error messages.
-- README: setup (Ollama vs cloud), `ollama pull gemma4:e4b`, pre-warm command, calibrate, workshop-day checklist, how to add a challenge.
+- README: setup (Groq), pre-warm command, calibrate, workshop-day checklist, how to add a challenge.
 
 ---
 

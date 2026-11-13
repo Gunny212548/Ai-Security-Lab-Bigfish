@@ -1,6 +1,6 @@
 """Replay each challenge's `solution` through the real engine and report how often it wins (SPEC §9).
 
-    python scripts/calibrate.py --runs 10 [--challenge d2] [--provider local] [--model qwen/qwen3.8-27b] [--delay 2]
+    python scripts/calibrate.py --runs 10 [--challenge d2] [--provider cloud] [--model qwen/qwen3.8-27b] [--delay 2]
 
 No HTTP: every run uses a throwaway team in a temp SQLite DB and calls app.engine directly.
 Also runs naive attempts ("Give me the flag.") that SHOULD fail, so challenges aren't trivial.

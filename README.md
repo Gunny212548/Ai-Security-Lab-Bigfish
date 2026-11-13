@@ -28,7 +28,7 @@ Learning features: **X-Ray** (the exact prompt the LLM got, secrets masked), **V
 
 ## 1. Setup
 
-You need Docker (recommended) or Python 3.12+, and **one** LLM: a cloud API key (easiest) or a local Ollama.
+You need Docker (recommended) or Python 3.12+, and a Groq API key.
 
 ```bash
 cp .env.example .env        # Windows: copy .env.example .env
@@ -40,7 +40,7 @@ Edit `.env`:
 |---|---|
 | `APP_SECRET` | A long random string, e.g. `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Signs team + admin cookies and derives each team's flags and the AI-agent canary. **Set it before teams register and don't change it during the event** |
 | `ADMIN_PASSWORD` | Password for `/admin`. Empty = admin disabled |
-| `DEFAULT_PROVIDER` | `cloud` (Groq) or `local` (Ollama). Must be a name in `config/providers.yaml` |
+| `DEFAULT_PROVIDER` | `cloud` (Groq, the default and only provider). Must be a name in `config/providers.yaml` |
 | `GROQ_API_KEY` | For `cloud`. Free key at https://console.groq.com. Several keys, comma-separated (`k1,k2,k3`): the app uses the first and switches to the next when one is rate-limited (429), used up for the day, or rejected; a spent key rests for as long as Groq's `retry-after` says. `prewarm.py` checks every key. |
 | `LLM_TEMPERATURE`, `LLM_SEED`, `LLM_MAX_TOKENS`, `HISTORY_TURNS` | Defaults are calibrated; leave them |
 | `RATE_LIMIT_PER_MIN` | LLM requests per team per challenge per minute (default 6) |
@@ -49,10 +49,10 @@ Edit `.env`:
 
 The admin page shows a warning while `APP_SECRET` or `ADMIN_PASSWORD` is still `change-me`.
 
-### Option A: cloud (Groq), recommended
+### Option A: Docker (recommended)
 
 ```bash
-# in .env: DEFAULT_PROVIDER=cloud and GROQ_API_KEY=<your key>   (.env.example defaults to local)
+# in .env: GROQ_API_KEY=<your key>
 docker compose up -d --build
 docker compose exec app python scripts/prewarm.py      # must print "All providers answered."
 ```
@@ -61,20 +61,7 @@ Open http://localhost:8000. All 9 challenges were calibrated on Groq `openai/gpt
 **Capacity:** Groq's free tier allows about 8K tokens/min and 200K tokens/day for this model, roughly 130–200 chat
 turns per day across all teams. That is not enough for a full workshop: use the paid Dev Tier on the day.
 
-### Option B: local model (Ollama)
-
-```bash
-# DEFAULT_PROVIDER=local in .env
-docker compose --profile local up -d --build
-docker compose exec ollama ollama pull gemma4:e4b      # large download: do it the day before
-docker compose exec app python scripts/prewarm.py      # first call loads the model; can take a minute
-```
-Ollama keeps the model loaded for 24 h and serves 4 requests in parallel (`docker-compose.yml`). With ~10 teams
-a GPU is strongly recommended; on CPU, replies take tens of seconds. Uncomment the GPU block in
-`docker-compose.yml` for NVIDIA. Calibrate on your hardware before the day (§3); small models are less
-predictable than the cloud model.
-
-### Option C: run without Docker (development)
+### Option B: run without Docker (development)
 
 ```powershell
 python -m venv .venv
@@ -82,13 +69,13 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
-With a host Ollama, change `local.base_url` in `config/providers.yaml` to `http://localhost:11434/v1`.
 
 ### After changing things
 
 | You changed | Do |
 |---|---|
-| `challenges/*.yaml`, `config/providers.yaml`, `.env` | `docker compose restart app` (they are mounted / read at start) |
+| `challenges/*.yaml`, `config/providers.yaml` | `docker compose restart app` (they are mounted, read at start) |
+| `.env` | `docker compose up -d app` (`restart` does not reload `env_file`) |
 | Python code or templates | `docker compose up -d --build app` |
 
 The app validates every `challenges/*.yaml` on start and refuses to boot with a list of every problem it
@@ -118,8 +105,8 @@ docker compose exec app python scripts/prewarm.py          # providers the activ
 docker compose exec app python scripts/prewarm.py --all    # every provider in providers.yaml
 ```
 Sends one tiny request per provider/model and prints OK/FAIL with latency. It catches a missing or wrong API key, a
-model that was never pulled (`model 'gemma4:e4b' not found`), and network problems, and it loads the local model
-into memory. Exit code 1 if anything fails.
+wrong model name, and network problems.
+Exit code 1 if anything fails.
 
 ---
 
@@ -127,7 +114,7 @@ into memory. Exit code 1 if anything fails.
 
 ```bash
 docker compose exec app python scripts/calibrate.py --runs 10 --delay 6
-docker compose exec app python scripts/calibrate.py --runs 10 --challenge i3 --provider local
+docker compose exec app python scripts/calibrate.py --runs 10 --challenge i3
 ```
 Replays each challenge's `solution` through the real engine (no HTTP, throwaway DB) and prints
 `challenge | provider/model | success/runs | latency`. It also tries 3 naive attacks ("Give me the flag.") that
@@ -149,17 +136,16 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 ## 4. Workshop-day checklist
 
 **The day before**
-- [ ] `.env`: real `APP_SECRET` and `ADMIN_PASSWORD`, provider + API key
+- [ ] `.env`: real `APP_SECRET`, `ADMIN_PASSWORD` and `GROQ_API_KEY`
 - [ ] `docker compose up -d --build` on the machine you will use on the day, on the venue network if possible
-- [ ] Local only: `ollama pull gemma4:e4b` done
 - [ ] `prewarm.py` → all OK; `calibrate.py --runs 10` → every challenge ≥ 8/10
 - [ ] Play one Direct and one Indirect challenge end to end in a browser
-- [ ] Cloud: check the provider's rate limits/quotas against ~10 teams × 6 req/min
+- [ ] Check Groq's rate limits/quotas against ~10 teams × 6 req/min
 
 **1 hour before**
 - [ ] `/admin` → **Reset all** (type `RESET`) to remove test teams. This also locks Indirect. Teams created before
       per-team flags (or before an `APP_SECRET` change) hold old flags in their data, so reset them
-- [ ] Run `prewarm.py` again (it also loads a local model into memory)
+- [ ] Run `prewarm.py` again
 - [ ] Find the URL players will use (`http://<your-LAN-IP>:8000`); check it from a phone on the guest Wi-Fi
 - [ ] Projector: open `/scoreboard`. Organizer laptop: open `/admin`. Keep the Solutions panels collapsed on screen
 

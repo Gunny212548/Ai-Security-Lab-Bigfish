@@ -94,7 +94,6 @@ def test_prewarm_targets_and_missing_key(monkeypatch, capsys):
     code = asyncio.run(prewarm.main(["--all"]))
     out = capsys.readouterr().out
     assert code == 1 and "GROQ_API_KEY is not set" in out and "FAIL" in out
-    assert "local" in out and "OK" in out
 
 
 def test_prewarm_pings_every_key(monkeypatch, capsys):

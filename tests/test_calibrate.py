@@ -27,7 +27,7 @@ def test_flag_leak_ignores_spacing_and_case():
 
 async def test_on_impact_win_counts(challenges, session):
     rep = await run(session, challenges["d1"], FakeClient(text("I have been PWNED")))
-    assert rep.wins == 1 and rep.target == "local/fake-model"
+    assert rep.wins == 1 and rep.target == "cloud/fake-model"
 
 
 async def test_in_data_none_counts_flag_in_reply(challenges, session):

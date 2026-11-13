@@ -66,7 +66,7 @@ def test_spec_specific_details(challenges):
 
 def _expect_error(write_challenges, data, *fragments):
     with pytest.raises(ChallengeConfigError) as exc:
-        load_challenges(write_challenges([data]), {"local", "cloud"})
+        load_challenges(write_challenges([data]), {"cloud"})
     msg = str(exc.value)
     for f in fragments:
         assert f in msg, msg
@@ -149,7 +149,7 @@ def test_duplicate_flag_fails(raw_challenge, write_challenges):
     a, b = raw_challenge("d1"), raw_challenge("d2")
     b["flag"] = a["flag"]
     with pytest.raises(ChallengeConfigError, match="duplicate flag"):
-        load_challenges(write_challenges([a, b]), {"local", "cloud"})
+        load_challenges(write_challenges([a, b]), {"cloud"})
 
 
 def test_all_errors_reported_together(raw_challenge, write_challenges):
@@ -157,5 +157,5 @@ def test_all_errors_reported_together(raw_challenge, write_challenges):
     del a["flag"]
     b["tools"] = ["nope"]
     with pytest.raises(ChallengeConfigError) as exc:
-        load_challenges(write_challenges([a, b]), {"local", "cloud"})
+        load_challenges(write_challenges([a, b]), {"cloud"})
     assert "d1.yaml" in str(exc.value) and "d5.yaml" in str(exc.value)

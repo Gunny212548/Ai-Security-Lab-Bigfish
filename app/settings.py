@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     app_secret: str = "change-me"
     admin_password: str = "change-me"
-    default_provider: str = "local"
+    default_provider: str = "cloud"
     groq_api_key: str = ""
     llm_temperature: float = 0.3
     llm_seed: int = 42

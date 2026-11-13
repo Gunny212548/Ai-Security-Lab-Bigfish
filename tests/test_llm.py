@@ -30,7 +30,7 @@ async def test_plain_reply_passes_settings(challenges, session, make_team):
 
 async def test_provider_max_tokens_overrides_setting(challenges, session, make_team):
     client = FakeClient(text("ok"))
-    providers = {"local": Provider(name="local", base_url="http://fake/v1", api_key="x", model="m", max_tokens=2000)}
+    providers = {"cloud": Provider(name="cloud", base_url="http://fake/v1", api_key="x", model="m", max_tokens=2000)}
     msgs = [{"role": "user", "content": "hi"}]
     ch = challenges["d1"]
     await run_llm(ch, msgs, ctx(session, make_team(), ch), client=client, settings=SETTINGS, providers=providers)
@@ -188,11 +188,11 @@ def test_provider_resolution(challenges):
     from app.llm import resolve_provider
     from app.settings import Provider
 
-    providers = {**PROVIDERS, "cloud": Provider(name="cloud", base_url="http://c", api_key="k", model="cloud-m")}
+    providers = {**PROVIDERS, "other": Provider(name="other", base_url="http://o", api_key="k", model="other-m")}
     ch = challenges["d1"]
     assert resolve_provider(ch, SETTINGS, providers)[1] == "fake-model"
-    assert resolve_provider(ch.model_copy(update={"provider": "cloud"}), SETTINGS, providers)[1] == "cloud-m"
-    assert resolve_provider(ch.model_copy(update={"provider": "cloud", "model": "x"}), SETTINGS, providers)[1] == "x"
+    assert resolve_provider(ch.model_copy(update={"provider": "other"}), SETTINGS, providers)[1] == "other-m"
+    assert resolve_provider(ch.model_copy(update={"provider": "other", "model": "x"}), SETTINGS, providers)[1] == "x"
 
 
 @pytest.fixture(autouse=True)
@@ -206,7 +206,7 @@ def _no_real_clients(monkeypatch):
 
 async def test_provider_without_seed_support_omits_seed(challenges, session, make_team):
     client = FakeClient(text("ok"))
-    providers = {"local": Provider(name="local", base_url="http://fake/v1", api_key="x", model="m", supports_seed=False)}
+    providers = {"cloud": Provider(name="cloud", base_url="http://fake/v1", api_key="x", model="m", supports_seed=False)}
     ch = challenges["d1"]
     await run_llm(ch, [{"role": "user", "content": "hi"}], ctx(session, make_team(), ch), client=client,
                   settings=SETTINGS, providers=providers)

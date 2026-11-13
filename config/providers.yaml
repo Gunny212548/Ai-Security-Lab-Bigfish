@@ -1,12 +1,6 @@
 # Named OpenAI-compatible LLM providers.
 # A challenge picks one with `provider:` (defaults to DEFAULT_PROVIDER) and may override `model:`.
 # Use `api_key` for a literal key, or `api_key_env` to read it from the environment / .env.
-#
-# Running the app outside Docker with a host Ollama? Change base_url to http://localhost:11434/v1
-local:
-  base_url: http://ollama:11434/v1
-  api_key: ollama
-  model: gemma4:e4b
 cloud:
   # Groq (https://console.groq.com/docs/models). Supports tools + JSON mode + seed.
   base_url: https://api.groq.com/openai/v1

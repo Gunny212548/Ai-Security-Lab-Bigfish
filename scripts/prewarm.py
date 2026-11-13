@@ -4,8 +4,8 @@
     python scripts/prewarm.py --all      # every provider in config/providers.yaml
     docker compose exec app python scripts/prewarm.py
 
-Run it ~15 minutes before the workshop. It loads the local model into memory (the first Ollama request
-can take a minute) and proves the cloud API key, model name and network path work. Exit code 1 if any fail.
+Run it ~15 minutes before the workshop. It proves the API key(s), model name and network path work.
+Exit code 1 if any fail.
 """
 
 from __future__ import annotations
