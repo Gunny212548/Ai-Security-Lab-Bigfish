@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 6
     fast_solve_seconds: int = 90  # admin marks correct flags faster than this (from first page view) with ⚡
     per_team_flags: bool = True  # each team gets its own flag variant (app/flags.py)
+    log_level: str = "INFO"
+    activity_log_file: str = (ROOT_DIR / "data" / "activity.log").as_posix()  # "" = Docker logs only
 
     database_url: str = f"sqlite:///{(ROOT_DIR / 'data' / 'bigfishdesk.db').as_posix()}"
     challenges_dir: Path = ROOT_DIR / "challenges"

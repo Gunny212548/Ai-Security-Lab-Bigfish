@@ -94,6 +94,21 @@ With a host Ollama, change `local.base_url` in `config/providers.yaml` to `http:
 The app validates every `challenges/*.yaml` on start and refuses to boot with a list of every problem it
 found. See it with `docker compose logs app`.
 
+### Watch what players do
+
+Every action is one line: time, IP, team, challenge, event, and the details (full chat message and AI reply,
+tool calls, flags submitted, hints opened, KB/plugin/ticket text, PDF uploads, admin logins and resets).
+
+```bash
+docker compose logs -f app | grep activity                 # live
+docker compose logs app | grep '| Red Team#' | grep chat    # one team's chats
+tail -f data/activity.log                                   # same lines, kept across rebuilds
+grep '| flag |' data/activity.log                           # every flag submitted
+```
+
+`docker compose up --build` recreates the container and drops its Docker logs; `data/activity.log` keeps
+everything (rotates at 20 MB, 10 files). Set `ACTIVITY_LOG_FILE=` (empty) in `.env` for Docker logs only.
+
 ---
 
 ## 2. Pre-warm / smoke test

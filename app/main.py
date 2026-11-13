@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import auth, engine, i18n, scoreboard, state
+from app import activity, auth, engine, i18n, scoreboard, state
 from app.challenges import OWASP_LLM_2025, PLAYER_TICKET_ID, Challenge, load_challenges
 from app.db import (INDIRECT_UNLOCKED, HintView, Solve, Submission, Team, VictimRun, get_flag, get_session,
                     get_engine, init_db, reset_all, set_flag)
@@ -72,6 +72,7 @@ SCOREBOARD_REFRESH_S = 10
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    activity.setup(settings)
     providers = load_providers(settings.providers_file, settings.default_provider)
     challenges = load_challenges(settings.challenges_dir, set(providers))  # fails fast on bad config
     init_db(settings.database_url)
@@ -281,6 +282,7 @@ def index(request: Request, session: Session = Depends(get_session)):
 def create_team(request: Request, name: str = Form(""), session: Session = Depends(get_session)):
     name = " ".join(name.split())
     if not name or len(name) > auth.MAX_TEAM_NAME:
+        activity.record(request, "team_create_failed", name=name, reason="bad name")
         return page(request, "join.html", {"error": t("Team name must be 1–{n} characters.", n=auth.MAX_TEAM_NAME),
                                            "name": name, "code": ""})
     team = Team(name=name, join_code=auth.new_join_code(session))
@@ -289,9 +291,11 @@ def create_team(request: Request, name: str = Form(""), session: Session = Depen
         session.commit()
     except IntegrityError:
         session.rollback()
+        activity.record(request, "team_create_failed", name=name, reason="name taken")
         return page(request, "join.html", {"error": t("That team name is taken. Ask your teammates for the join code."),
                                            "name": name, "code": ""})
     state.seed_team(session, team.id, request.app.state.challenges.values())
+    activity.record(request, "team_create", team, join_code=team.join_code)
     return login_response(team, request)
 
 
@@ -300,7 +304,9 @@ def join_team(request: Request, code: str = Form(""), session: Session = Depends
     code = code.strip().upper()
     team = session.exec(select(Team).where(Team.join_code == code)).first() if code else None
     if team is None:
+        activity.record(request, "team_join_failed", code=code)
         return page(request, "join.html", {"error": t("No team has that join code."), "name": "", "code": code})
+    activity.record(request, "team_join", team)
     return login_response(team, request)
 
 
@@ -314,7 +320,8 @@ def set_language(code: str, next: str = "/"):
 
 
 @app.post("/team/leave")
-def leave_team():
+def leave_team(request: Request, session: Session = Depends(get_session)):
+    activity.record(request, "team_leave", auth.current_team(request, session))
     resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie(auth.COOKIE)
     return resp
@@ -354,6 +361,7 @@ def challenge_page(cid: str, request: Request, team: Team = Depends(team_dep),
                    session: Session = Depends(get_session)):
     ch = get_challenge(request, session, cid)
     scoreboard.record_view(session, team.id, ch.id)
+    activity.record(request, "open", team, ch.id)
     if ch.track != "direct":
         return page(request, "indirect.html", {
             **hint_ctx(session, team.id, ch),
@@ -382,6 +390,7 @@ async def chat(cid: str, request: Request, message: str = Form(""), team: Team =
 
     notice = limited(request, team, ch)
     if notice:
+        activity.record(request, "chat_limited", team, ch.id, msg=text, notice=notice)
         return partial(request, "_chat_notice.html", {"ch": ch, "user_text": text, "notice": notice})
 
     limiter: RateLimiter = request.app.state.limiter
@@ -392,6 +401,9 @@ async def chat(cid: str, request: Request, message: str = Form(""), team: Team =
                                          settings=request.app.state.settings)
         finally:
             limiter.in_flight -= 1
+    activity.record(request, "chat", team, ch.id, msg=text, reply=out.reply, won=out.won, blocked=out.blocked or None,
+                    redacted=out.redacted or None, error=out.error, tools=activity.tools(out.tool_trace) or None,
+                    model=out.model or None, latency_s=round(out.latency_s, 2))
     return partial(request, "_chat_turn.html", {"ch": ch, "user_text": text, "out": out, "mask": MASK})
 
 
@@ -401,6 +413,7 @@ def submit_flag(cid: str, request: Request, flag: str = Form(""), team: Team = D
     ch = get_challenge(request, session, cid)
     value = flag.strip()[:MAX_FLAG_CHARS]
     if not value:
+        activity.record(request, "flag_empty", team, ch.id)
         return partial(request, "_submit_result.html", {"ch": ch, "result": "empty"})
     correct = value == flag_for(ch, team.id)
     signal = "" if correct else flag_signal(session, ch, value, team.id)
@@ -417,6 +430,8 @@ def submit_flag(cid: str, request: Request, flag: str = Form(""), team: Team = D
             session.add(Solve(team_id=team.id, challenge_id=ch.id, points=awarded))
             result = "correct"
     session.commit()
+    activity.record(request, "flag", team, ch.id, value=value, result=result, points=awarded, signal=signal or None,
+                    no_activity=no_activity or None, solve_s=seconds)
     return partial(request, "_submit_result.html", {"ch": ch, "result": result, "awarded": awarded,
                                                     **hint_ctx(session, team.id, ch),
                                                     "score": team_score(session, team.id)})
@@ -437,6 +452,7 @@ def reveal_hint(cid: str, n: int, request: Request, team: Team = Depends(team_de
             session.commit()
         except IntegrityError:  # double click from two teammates
             session.rollback()
+        activity.record(request, "hint", team, ch.id, n=n + 1)
     return partial(request, "_hints.html", {"ch": ch, "oob": True, **hint_ctx(session, team.id, ch)})
 
 
@@ -448,6 +464,7 @@ def new_chat(cid: str, request: Request, team: Team = Depends(team_dep), session
     if ch.track != "direct":
         raise HTTPException(status_code=400, detail="only chat challenges have a chat to restart")
     state.new_chat(session, team.id, ch.id)
+    activity.record(request, "new_chat", team, ch.id)
     return RedirectResponse(f"/c/{ch.id}", status_code=303)
 
 
@@ -459,6 +476,7 @@ def edit_kb(cid: str, request: Request, article_id: str = Form(""), body: str = 
             team: Team = Depends(team_dep), session: Session = Depends(get_session)):
     ch = get_challenge(request, session, cid)
     require_surface(ch, "kb_edit")
+    activity.record(request, "kb_edit", team, ch.id, article=article_id, body=body)
     if len(body) > MAX_KB_BODY:
         return partial(request, "_attacker_kb.html",
                        surface_ctx(session, team.id, ch, error=t("Article is longer than {n} characters", n=MAX_KB_BODY)))
@@ -474,6 +492,7 @@ def publish_plugin(cid: str, request: Request, plugin_id: str = Form(""), descri
                    team: Team = Depends(team_dep), session: Session = Depends(get_session)):
     ch = get_challenge(request, session, cid)
     require_surface(ch, "plugin_edit")
+    activity.record(request, "plugin_edit", team, ch.id, plugin=plugin_id, description=description)
     if len(description) > MAX_PLUGIN_DESC:
         return partial(request, "_attacker_plugin.html", surface_ctx(
             session, team.id, ch, error=t("Usage notes are longer than {n} characters", n=MAX_PLUGIN_DESC)))
@@ -490,6 +509,7 @@ def submit_ticket(cid: str, request: Request, title: str = Form(""), description
                   team: Team = Depends(team_dep), session: Session = Depends(get_session)):
     ch = get_challenge(request, session, cid)
     require_surface(ch, "ticket_form")
+    activity.record(request, "ticket", team, ch.id, title=title, description=description)
     error = None
     if len(title) > MAX_TICKET_TITLE or len(description) > MAX_TICKET_DESC:
         error = t("Title max {title} and description max {desc} characters", title=MAX_TICKET_TITLE, desc=MAX_TICKET_DESC)
@@ -513,8 +533,12 @@ async def upload_pdf(cid: str, request: Request, file: UploadFile = File(...), t
     try:
         check = check_pdf(data)
     except PdfRejected as e:
+        activity.record(request, "pdf_rejected", team, ch.id, file=file.filename, size=len(data), reason=str(e))
         return partial(request, "_attacker_pdf.html", surface_ctx(session, team.id, ch, error=t(str(e))))
     name = (Path(file.filename or "request.pdf").name or "request.pdf")[:MAX_FILENAME]
+    activity.record(request, "pdf_upload", team, ch.id, file=name, size=len(data), pages=check.pages,
+                    hidden_spans=check.hidden_spans_count, caught_by_human=check.caught_by_human,
+                    ai_text=check.ai_text)
     state.add_upload(session, team.id, ch, name, check)
     return partial(request, "_attacker_pdf.html",
                    surface_ctx(session, team.id, ch, notice=t("Attached “{name}” ✅ IT Staff will review it.", name=name)))
@@ -528,6 +552,7 @@ async def run_victim(cid: str, request: Request, team: Team = Depends(team_dep),
         raise HTTPException(status_code=400, detail="not an indirect challenge")
     notice = limited(request, team, ch)
     if notice:
+        activity.record(request, "victim_limited", team, ch.id, notice=notice)
         resp = partial(request, "_victim_notice.html", {"notice": notice})
         resp.headers["HX-Reswap"] = "none"  # keep the current Victim POV; the notice swaps in out-of-band
         return resp
@@ -538,8 +563,12 @@ async def run_victim(cid: str, request: Request, team: Team = Depends(team_dep),
             out = await engine.victim_run(session, team.id, ch, llm=request.app.state.llm)
         finally:
             limiter.in_flight -= 1
+    view = victim_view(ch, out)
+    activity.record(request, "victim_run", team, ch.id, status=view["status"], reply=out.reply, won=out.won,
+                    error=out.error, tools=activity.tools(out.tool_trace) or None, model=out.model or None,
+                    latency_s=round(out.latency_s, 2))
     upload = state.latest_upload(session, team.id, ch.id) if ch.attacker_surface == "pdf_upload" else None
-    return partial(request, "_victim_run.html", {"ch": ch, "victim": victim_view(ch, out), "upload": upload,
+    return partial(request, "_victim_run.html", {"ch": ch, "victim": view, "upload": upload,
                                                  "xray_items": out.xray})
 
 
@@ -677,9 +706,12 @@ def admin_login(request: Request, password: str = Form("")):
     ip = request.client.host if request.client else "?"
     wait = request.app.state.admin_limiter.hit(("admin-login", ip))
     if wait is not None:
+        activity.record(request, "admin_login_limited")
         return admin_login_page(request, slow_down_message(wait))
     if not auth.check_admin_password(password[:MAX_ADMIN_PASSWORD], settings.admin_password):
+        activity.record(request, "admin_login_failed")
         return admin_login_page(request, "Wrong password.")
+    activity.record(request, "admin_login")
     resp = RedirectResponse("/admin", status_code=303)
     resp.set_cookie(auth.ADMIN_COOKIE, auth.admin_token(settings.admin_password, settings.app_secret),
                     max_age=auth.ADMIN_COOKIE_MAX_AGE, httponly=True, samesite="strict")
@@ -687,15 +719,17 @@ def admin_login(request: Request, password: str = Form("")):
 
 
 @app.post("/admin/logout")
-def admin_logout():
+def admin_logout(request: Request):
+    activity.record(request, "admin_logout")
     resp = RedirectResponse("/admin", status_code=303)
     resp.delete_cookie(auth.ADMIN_COOKIE)
     return resp
 
 
 @app.post("/admin/indirect", dependencies=[Depends(admin_dep)])
-def admin_indirect(unlock: str = Form(""), session: Session = Depends(get_session)):
+def admin_indirect(request: Request, unlock: str = Form(""), session: Session = Depends(get_session)):
     on = unlock == "1"
+    activity.record(request, "admin_indirect_unlock" if on else "admin_indirect_lock")
     set_flag(session, INDIRECT_UNLOCKED, "1" if on else "0")
     return RedirectResponse(f"/admin?msg={'unlocked' if on else 'locked'}", status_code=303)
 
@@ -703,9 +737,11 @@ def admin_indirect(unlock: str = Form(""), session: Session = Depends(get_sessio
 @app.post("/admin/reset-all", dependencies=[Depends(admin_dep)])
 def admin_reset_all(request: Request, confirm: str = Form(""), session: Session = Depends(get_session)):
     if confirm.strip() != RESET_ALL_CONFIRM:
+        activity.record(request, "admin_reset_all_cancelled")
         return page(request, "admin.html", admin_ctx(
             request, session, error=f"Type {RESET_ALL_CONFIRM} in the box to confirm. Nothing was deleted."))
     reset_all(session)
+    activity.record(request, "admin_reset_all")
     return RedirectResponse("/admin?msg=reset", status_code=303)
 
 

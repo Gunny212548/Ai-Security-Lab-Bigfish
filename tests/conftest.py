@@ -7,6 +7,7 @@ _TMP = Path(tempfile.mkdtemp(prefix="bigfishdesk-test-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 # Existing tests assert the base flag from the YAML; tests/test_flags.py switches per-team flags on.
 os.environ["PER_TEAM_FLAGS"] = "false"
+os.environ["ACTIVITY_LOG_FILE"] = ""  # tests: no data/activity.log in the repo
 
 import pytest  # noqa: E402
 import yaml  # noqa: E402

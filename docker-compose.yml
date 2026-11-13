@@ -6,8 +6,14 @@ services:
         required: false
     environment:
       DATABASE_URL: sqlite:////app/data/bigfishdesk.db
+      TZ: ICT-7           # log times in Thai time (POSIX form: works without tzdata in the slim image)
     ports:
       - "8000:8000"
+    logging:              # what players do: `docker compose logs -f app`; full history: data/activity.log
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     volumes:
       - ./data:/app/data
       - ./challenges:/app/challenges:ro
