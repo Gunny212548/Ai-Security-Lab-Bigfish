@@ -123,6 +123,7 @@ Replays each challenge's `solution` through the real engine (no HTTP, throwaway 
 Last run (Groq `gpt-oss-120b`, 2026-11-06; details and walkthroughs in `WRITEUP.md`): D5 10/10, D6 10/10,
 D7 30/30, I1 10/10, I2 10/10, I3 10/10, I4 9/9 (+1 rate-limit error); D8 10/10, D9 10/10 (2026-11-09). Results vary between runs (I2 was 8/10 the
 day before), so if an attempt fails players can simply send the message or run the victim again.
+Re-run 2026-11-16 (5 runs each, after D8/D9 stopped retyping SQL rows): every challenge 5/5, naive asks 3/3 failed.
 
 If a challenge falls below 8/10 on your model: try another model (`--model`), or set `provider:`/`model:` in that
 challenge's YAML. Don't rewrite prompts on the day; the solutions and hints depend on them.

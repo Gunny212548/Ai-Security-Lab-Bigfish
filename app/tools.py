@@ -24,7 +24,7 @@ class ToolContext:
     session: Session
     sql_tables: list[SeedSqlTable] = field(default_factory=list)  # database for run_sql (D8) / query_helpdesk_db (D9)
     sql_override_code: str = ""  # D9
-    sql_refused: bool = False  # D8: the guard refused a query earlier in this reply (one ToolContext per reply)
+    sql_refusal: str = ""  # D8: the guard's message for a query it refused earlier in this reply (one ToolContext per reply)
 
 
 class ToolError(Exception):
@@ -211,25 +211,35 @@ def _execute(con: sqlite3.Connection, q: str, *, dlp: bool, scoped: bool = False
     out.update(columns=columns, rows=[[cell(v) for v in r] for r in rows[:SQL_MAX_ROWS]])
     if len(rows) > SQL_MAX_ROWS:
         out["note"] = f"only the first {SQL_MAX_ROWS} rows are shown"
+    out["display"] = SQL_ROWS_DISPLAYED
     return json.dumps(out, ensure_ascii=False)
+
+
+# The chat shows these rows as a table under the call (_tool_calls.html). Retyped by the AI they lost rows, changed
+# years and derailed into "?? … ..." (2026-11-12, 2026-11-16). The prompt rule alone stopped it on D8 (0/20 tables)
+# but not on D9 (6/20), whose prompt says "show" for its own rules; said again here, next to the rows, it holds.
+SQL_ROWS_DISPLAYED = ("The user already sees these rows as a table under this tool call. Do not retype them or draw "
+                      "a table: answer in one or two sentences.")
 
 
 # Lab fairness, not part of the challenge: after a refusal the model would sometimes rewrite the query on its own
 # until it got past the guard (a 2026-11-12 session: "check all ticket" -> it retried with `OR 1=1`), handing the
 # player the bypass for free. Telling it not to in the system prompt made it retry more, so the tool enforces it:
 # once the guard has refused a query, the rest of that reply gets no more queries; the player decides what's next.
+# The message carries the refusal itself: "quote the earlier error" alone made the model quote a refusal from an
+# earlier turn (2026-11-16: "show databases;" was refused for the owner filter, the reply quoted sqlite_master).
 SQL_REFUSED_RETRY = ("SQL guard: a query was already refused in this reply, so no more queries run until the user's "
-                     "next message. Quote the earlier error to the user and stop.")
+                     "next message. Tell the user that refusal, quoting it exactly, and stop: {error}")
 
 
 def run_sql(ctx: ToolContext, query: str) -> str:
-    if ctx.sql_refused:
-        raise ToolError(SQL_REFUSED_RETRY)
+    if ctx.sql_refusal:
+        raise ToolError(SQL_REFUSED_RETRY.format(error=ctx.sql_refusal))
     q = _check_query(query)
     try:
         sql_guard(q, {t.name.lower() for t in ctx.sql_tables if t.exposed}, ctx.current_user)
-    except ToolError:
-        ctx.sql_refused = True
+    except ToolError as e:
+        ctx.sql_refusal = str(e)
         raise
     return _execute(_sql_database(ctx.sql_tables, ctx.flag), q, dlp=True)
 

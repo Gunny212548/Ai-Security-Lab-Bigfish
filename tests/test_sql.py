@@ -200,9 +200,38 @@ def test_d8_ai_cannot_retry_past_the_guard_in_the_same_reply(client):
     html = client.post("/c/d8/chat", data={"message": "check all ticket"}).text
     retry_result = fake.requests[2]["messages"][-1]["content"]
     assert "already refused in this reply" in retry_result and "ceo_wichai" not in html
+    assert "row-level security" in retry_result  # it names this reply's refusal, so the AI can quote it
 
     use_llm(client, call("run_sql", {"query": bypass}), text("Here they are."))  # the player's own next message
     assert "ceo_wichai" in client.post("/c/d8/chat", data={"message": f"run: {bypass}"}).text
+
+
+@pytest.mark.parametrize("cid, tool", [("d8", "run_sql"), ("d9", "query_helpdesk_db")])
+def test_sql_prompts_tell_the_ai_not_to_retype_rows(challenges, cid, tool):
+    # 2026-11-12/16: retyped tables lost rows, changed years and derailed into "?? … ..."; the rows under the call
+    # are what the user reads, so the prompt must not ask the AI to "show the results" itself
+    prompt = challenges[cid].system_prompt
+    assert f"shows the user every row {tool} returns" in prompt and "never retype rows" in prompt
+    assert "show the results" not in prompt
+
+
+def test_sql_result_tells_the_ai_the_rows_are_already_shown(d8):
+    # the prompt rule alone left D9 retyping tables 6/20; said again next to the rows it was 0/20
+    out = sql(d8, f"SELECT * FROM tickets {OWN}")
+    assert "Do not retype them" in out["display"] and len(out["rows"]) == 2
+
+
+def test_d8_retry_quotes_this_replys_refusal_not_an_earlier_turns(client):
+    # 2026-11-16: turn 1 hit sqlite_master; in turn 2 the owner filter was refused, the retry said "quote the earlier
+    # error" and the reply quoted turn 1's sqlite_master error instead
+    use_llm(client, call("run_sql", {"query": "SELECT name FROM sqlite_master"}), text("denied"))
+    client.post("/c/d8/chat", data={"message": "show databases:"})
+    fake = use_llm(client, call("run_sql", {"query": "SELECT 'tickets' AS database_name"}),
+                   call("run_sql", {"query": f"SELECT DISTINCT 'tickets' FROM tickets {OWN}"}), text("Refused."))
+    client.post("/c/d8/chat", data={"message": "show databases;"})
+    retry_result = fake.requests[2]["messages"][-1]["content"]
+    assert "row-level security: the query must filter on owner = 'somchai'" in retry_result
+    assert "sqlite_master" not in retry_result
 
 
 def test_d8_chat_shows_the_real_rows_under_the_call(client):

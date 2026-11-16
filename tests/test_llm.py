@@ -228,7 +228,18 @@ async def test_reasoning_tags_are_stripped(challenges, session, make_team, raw, 
 GARBLED = "Here are your tickets:\n\n| 4001 | somchai | Laptop\u00a0\u200b\u200b…\u00a0…\u00a0…" + " ..." * 40
 
 
-@pytest.mark.parametrize("bad", [GARBLED, "x" + "\u200b" * 6, "", "<THOUGHT>cut off mid-thought"])
+# 2026-11-16: only 10 ellipses, but a run of "??" tokens; the model then "corrected" itself in the same reply
+GARBLED_QMARKS = ("| 4002 | somchai | Need access |  ?? ?? ?? ? ? ? ? ? ? … … … ... … … ... ... ... ...\n\n"
+                  "The answer appears to have been cut off or corrupted. Let's correct it.")
+
+
+@pytest.mark.parametrize("ok", ["Why? What changed? Is it the fan? Or the drive? Or both? Or neither? Hmm?",
+                                "Ticket 4001... and 4002... both open... I think. ? ?"])
+def test_normal_question_marks_and_ellipses_are_not_garbled(ok):
+    assert not llm_mod._garbled(ok)
+
+
+@pytest.mark.parametrize("bad", [GARBLED, GARBLED_QMARKS,"x" + "\u200b" * 6, "", "<THOUGHT>cut off mid-thought"])
 async def test_garbled_answer_is_asked_again_with_another_seed(challenges, session, make_team, bad):
     client = FakeClient(text(bad), text("Here are your tickets."))
     r = await run(challenges["d1"], client, session, make_team())
@@ -241,6 +252,28 @@ async def test_garbled_every_time_without_tools_is_an_error(challenges, session,
     r = await run(challenges["d1"], client, session, make_team())
     assert r.content == llm_mod.GARBLED_MESSAGE and r.error == "Garbled"
     assert [q["seed"] for q in client.requests] == [42, 43, 44]
+
+
+# --- gpt-oss answering twice in one reply (2026-11-16, D9) --------------------------------------------------------
+
+@pytest.mark.parametrize("raw, expected", [
+    ("You have one open ticket (ID 5001) that was opened on 2026‑11‑03.Let me know if you need more.",
+     "You have one open ticket (ID 5001) that was opened on 2026‑11‑03."),
+    ("The IT department lists one employee: **it_somsak**.The IT department has a single staff member: **it_somsak**.",
+     "The IT department lists one employee: **it_somsak**."),
+])
+async def test_second_answer_glued_on_is_dropped(challenges, session, make_team, raw, expected):
+    r = await run(challenges["d1"], FakeClient(text(raw, reasoning="Provide answer.")), session, make_team())
+    assert r.content == expected
+
+
+@pytest.mark.parametrize("raw, reasoning", [
+    ("It was opened on 2026-11-03.Let me know.", None),  # no second thought: left alone
+    ("See e.g. The Guide. Version 2.5 is out. Ask me anything!", "Answer."),  # no seam
+])
+async def test_text_without_a_second_answer_is_left_alone(challenges, session, make_team, raw, reasoning):
+    r = await run(challenges["d1"], FakeClient(text(raw, reasoning=reasoning)), session, make_team())
+    assert r.content == raw
 
 
 async def test_garbled_after_tools_keeps_the_trace(challenges, session, make_team):

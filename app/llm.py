@@ -55,6 +55,10 @@ def _unknown_tool_note(name: str, tools: list[str]) -> dict[str, str]:
 # its 74 normal replies had at most 5. A garbled or empty answer is asked for again with another seed, and never
 # shown or stored: stored, it sits in the history and drags the next turns off course too.
 _ELLIPSIS_RE = re.compile(r"\.{3,}|…")
+# 2026-11-16 (D8): a derail that the model then "corrected" itself ("The answer appears to have been cut off or
+# corrupted. Let's correct it.") had only 10 ellipses, mixed into a run of "??" / "?" tokens. A run of 8+ such
+# tokens in a row (?, U+FFFD, … or ...) is never real text.
+_JUNK_RUN_RE = re.compile(r"(?:[?\ufffd\u2026]+|\.{3,})(?:\s+(?:[?\ufffd\u2026]+|\.{3,})){7,}")
 _ZERO_WIDTH = ("\u200b", "\u200c", "\u200d", "\u2060", "\ufeff")
 GARBLED_MIN_ELLIPSES = 12
 GARBLED_MIN_ZERO_WIDTH = 5
@@ -77,6 +81,7 @@ def _garbled_fallback(trace: list[ToolTraceEntry]) -> str:
 
 def _garbled(content: str) -> bool:
     return (len(_ELLIPSIS_RE.findall(content)) >= GARBLED_MIN_ELLIPSES
+            or _JUNK_RUN_RE.search(content) is not None
             or sum(content.count(z) for z in _ZERO_WIDTH) >= GARBLED_MIN_ZERO_WIDTH)
 
 
@@ -234,6 +239,24 @@ def _clean(content: str | None) -> str:
     return _TOOL_CALL_TEXT_RE.sub("", _THINK_RE.sub("", content or "")).strip()
 
 
+# gpt-oss on Groq sometimes answers, thinks again and answers a second time; Groq returns the second thought as
+# `reasoning` and glues both answers into `content` with no space at the seam: "...opened on 2026-11-03.Let me
+# know..." or "...one employee: it_somsak.The IT department has a single staff member: it_somsak." (2026-11-16:
+# about 1 D9 reply in 3). A clean final answer comes without `reasoning`, so only then is a seam (end of a sentence
+# straight into a capitalised word) cut, keeping the first answer.
+_SEAM_RE = re.compile(r"(?<=[a-z0-9*)\]\"”’])[.!?](?=[A-Z][a-z])")
+
+
+def _first_answer(content: str, reasoning: Any) -> str:
+    if not reasoning:
+        return content
+    m = _SEAM_RE.search(content)
+    if not m:
+        return content
+    log.info("gpt-oss answered twice; dropped the second answer: %r", content[m.end():][:200])
+    return content[:m.end()]
+
+
 async def run_llm(
     ch: Challenge,
     messages: list[dict[str, Any]],
@@ -298,7 +321,7 @@ async def run_llm(
                 msg = resp.choices[0].message
                 calls = msg.tool_calls or []
                 answer = not calls or not ch.tools or final
-                content = _clean(msg.content) if answer else ""
+                content = _first_answer(_clean(msg.content), getattr(msg, "reasoning", None)) if answer else ""
                 ok = (content and not _garbled(content)) or (final and not content)  # empty final: TOOL_LIMIT_MESSAGE
                 if not answer or ok or garbled_retries >= MAX_GARBLED_RETRIES:
                     break

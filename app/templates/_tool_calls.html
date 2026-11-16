@@ -1,8 +1,9 @@
 {# expects: calls = ToolTraceEntry list (live turn) or decoded TOOLS_ROLE rows (transcript), each with name, arguments,
    ok, result. A failed call shows the tool's own error ("SQL guard: ..."), so players can tell a refusal by the code
    from one by the AI. Successful results are not shown here (they may hold what an output filter hides; see X-Ray),
-   except the rows of the SQL tools (D8, D9): the AI retypes them in its reply and sometimes drops or changes rows
-   (a 2026-11-12 D8 reply cut ticket 4005 and changed a year), so the real rows sit under the call. They are no
+   except the rows of the SQL tools (D8, D9): retyped by the AI they came out with rows dropped, values changed and
+   whole replies garbled (2026-11-12, 2026-11-16), so the real rows sit under the call and the D8/D9 prompts tell the
+   AI not to retype them. They are no
    leak: X-Ray shows the same result, and run_sql's own DLP has already masked anything that looks like a flag. #}
 {% set table_tools = ["run_sql", "query_helpdesk_db"] %}
 {% if calls %}

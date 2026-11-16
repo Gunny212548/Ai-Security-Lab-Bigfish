@@ -10,8 +10,8 @@ from typing import Any
 from app.settings import Provider, Settings
 
 
-def text(content: str) -> SimpleNamespace:
-    return SimpleNamespace(content=content, tool_calls=None)
+def text(content: str, reasoning: str | None = None) -> SimpleNamespace:
+    return SimpleNamespace(content=content, tool_calls=None, reasoning=reasoning)
 
 
 def call(name: str, args: dict | str, call_id: str = "call_1") -> SimpleNamespace:
