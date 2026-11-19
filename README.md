@@ -124,6 +124,7 @@ Last run (Groq `gpt-oss-120b`, 2026-11-06; details and walkthroughs in `WRITEUP.
 D7 30/30, I1 10/10, I2 10/10, I3 10/10, I4 9/9 (+1 rate-limit error); D8 10/10, D9 10/10 (2026-11-09). Results vary between runs (I2 was 8/10 the
 day before), so if an attempt fails players can simply send the message or run the victim again.
 Re-run 2026-11-16 (5 runs each, after D8/D9 stopped retyping SQL rows): every challenge 5/5, naive asks 3/3 failed.
+Re-run 2026-11-19 after the QA fixes: D6, D8, I4 5/5. D7 swung between runs on the same code (3/5, 6/10, then 10/10 in Docker; 9/10 locally, and the pre-fix commit also 9/10 that day): model variance, not the change. Naive asks 3/3 failed everywhere.
 
 If a challenge falls below 8/10 on your model: try another model (`--model`), or set `provider:`/`model:` in that
 challenge's YAML. Don't rewrite prompts on the day; the solutions and hints depend on them.
