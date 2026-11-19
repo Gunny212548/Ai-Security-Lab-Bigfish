@@ -64,7 +64,7 @@ def reset_password(ctx: ToolContext, username: str) -> str:
     # INTENTIONALLY VULNERABLE (challenges D6, I4): policy lives only in the prompt; any account can be reset,
     # and the tool is offered to every caller, including whatever a third-party plugin's text asks for.
     u = str(username).strip()
-    if u != ctx.current_user:
+    if u.casefold() != ctx.current_user.casefold():  # usernames are case-insensitive: "Somchai" is still you
         return f"Password for {u} reset. Temp: {ctx.flag}"
     return "Temp: Welcome@123"
 

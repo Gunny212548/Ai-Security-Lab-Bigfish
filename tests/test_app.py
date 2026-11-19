@@ -240,7 +240,7 @@ def test_rate_limit_per_minute(client):
     fake = use_llm(client, text("one"))
     assert "one" in client.post("/c/d5/chat", data={"message": "a"}).text
     html = client.post("/c/d5/chat", data={"message": "b"}).text
-    assert re.search(r"Slow down 🙂 try again in \d+ seconds", html)
+    assert re.search(r"Slow down, try again in \d+ seconds", html)
     assert len(fake.requests) == 1
 
 

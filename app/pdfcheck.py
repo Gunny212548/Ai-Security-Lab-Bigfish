@@ -23,7 +23,11 @@ _SUSPICIOUS_RE = re.compile(
 
 
 class PdfRejected(ValueError):
-    """Upload refused; message is player-facing."""
+    """Upload refused; message is player-facing. `template` + `kw` let the UI translate it (app/i18n.py)."""
+
+    def __init__(self, template: str, **kw: object):
+        super().__init__(template.format(**kw) if kw else template)
+        self.template, self.kw = template, kw
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,32 @@ def find_suspicious(text: str) -> list[str]:
     return hits
 
 
+def _read_lines(doc: pymupdf.Document) -> tuple[list[str], list[str], int]:
+    """(lines the AI reads, lines a human sees, number of non-empty hidden spans)."""
+    ai_lines: list[str] = []
+    human_lines: list[str] = []
+    hidden = 0
+    for page in doc:
+        for block in page.get_text("dict")["blocks"]:
+            for line in block.get("lines", []):
+                ai_parts, human_parts = [], []
+                for span in line.get("spans", []):
+                    text = span.get("text", "")
+                    if not text:
+                        continue
+                    ai_parts.append(text)
+                    if _is_hidden(span):
+                        if text.strip():
+                            hidden += 1
+                    else:
+                        human_parts.append(text)
+                if ai_parts:
+                    ai_lines.append("".join(ai_parts))
+                if human_parts:
+                    human_lines.append("".join(human_parts))
+    return ai_lines, human_lines, hidden
+
+
 def check_pdf(data: bytes) -> PdfCheck:
     if len(data) > MAX_BYTES:
         raise PdfRejected("File is larger than 2 MB")
@@ -59,29 +89,14 @@ def check_pdf(data: bytes) -> PdfCheck:
     except Exception as e:  # noqa: BLE001
         raise PdfRejected("Could not open the PDF file") from e
     with doc:
+        if doc.needs_pass:  # opening works, reading a page would raise
+            raise PdfRejected("Password-protected PDFs are not supported")
         if doc.page_count > MAX_PAGES:
-            raise PdfRejected(f"PDF must be at most {MAX_PAGES} pages")
-        ai_lines: list[str] = []
-        human_lines: list[str] = []
-        hidden = 0
-        for page in doc:
-            for block in page.get_text("dict")["blocks"]:
-                for line in block.get("lines", []):
-                    ai_parts, human_parts = [], []
-                    for span in line.get("spans", []):
-                        text = span.get("text", "")
-                        if not text:
-                            continue
-                        ai_parts.append(text)
-                        if _is_hidden(span):
-                            if text.strip():
-                                hidden += 1
-                        else:
-                            human_parts.append(text)
-                    if ai_parts:
-                        ai_lines.append("".join(ai_parts))
-                    if human_parts:
-                        human_lines.append("".join(human_parts))
+            raise PdfRejected("PDF must be at most {n} pages", n=MAX_PAGES)
+        try:
+            ai_lines, human_lines, hidden = _read_lines(doc)
+        except Exception as e:  # noqa: BLE001  (a damaged page is a friendly refusal, not a 500)
+            raise PdfRejected("Could not open the PDF file") from e
         pages = doc.page_count
 
     human_text = "\n".join(human_lines).strip()

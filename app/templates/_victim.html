@@ -20,7 +20,7 @@
                       "P3": "bg-amber-500/20 text-amber-200"} %}
       <ol class="divide-y divide-slate-800 text-sm" data-triage>
         {% for t in tickets if t is mapping %}
-        {% set mine = t.ticket_id == "T-PLAYER" %}
+        {% set mine = (t.ticket_id | string | trim | upper) == "T-PLAYER" %}{# same rule as win._json_eq #}
         <li class="flex items-start gap-2.5 px-3 py-2 {{ 'bg-rose-950/30' if mine }}">
           <span class="w-4 shrink-0 pt-0.5 text-right text-xs text-slate-500">{{ loop.index }}</span>
           <span class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold {{ badge.get(t.priority | string, 'bg-slate-800 text-slate-300') }}">{{ t.priority or "?" }}</span>
@@ -33,7 +33,7 @@
       </ol>
       {% elif data is mapping and "approved" in data %}
       <div class="flex items-start gap-3 px-3 py-3" data-decision>
-        {% if data.approved is sameas true %}
+        {% if data.approved is sameas true or (data.approved is string and (data.approved | trim | lower) == "true") %}{# same rule as win._json_eq #}
         <span class="shrink-0 whitespace-nowrap rounded-md bg-emerald-500/20 px-2 py-1 text-sm font-bold text-emerald-200">{{ _("✅ Approved") }}</span>
         {% else %}
         <span class="shrink-0 whitespace-nowrap rounded-md bg-rose-500/20 px-2 py-1 text-sm font-bold text-rose-200">{{ _("❌ Rejected") }}</span>

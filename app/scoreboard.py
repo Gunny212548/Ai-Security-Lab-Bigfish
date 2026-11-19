@@ -74,7 +74,7 @@ def record_view(session: Session, team_id: int, challenge_id: str) -> None:
 
 
 def solve_stats(session: Session, team_id: int, challenge_id: str) -> tuple[int | None, int]:
-    """(seconds since the team first opened the challenge, chat messages + victim runs so far)."""
+    """(seconds since the team first opened or used the challenge, chat messages + victim runs so far)."""
     view = session.exec(select(ChallengeView).where(ChallengeView.team_id == team_id,
                                                     ChallengeView.challenge_id == challenge_id)).first()
     seconds = None

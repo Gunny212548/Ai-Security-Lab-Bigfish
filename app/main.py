@@ -21,12 +21,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import activity, auth, engine, i18n, scoreboard, state
 from app.challenges import OWASP_LLM_2025, PLAYER_TICKET_ID, Challenge, load_challenges
 from app.db import (INDIRECT_UNLOCKED, HintView, Solve, Submission, Team, VictimRun, get_flag, get_session,
-                    get_engine, init_db, reset_all, set_flag)
+                    get_engine, init_db, next_team_id, reset_all, set_flag)
 from app.filters import BLOCKED_INPUT_MESSAGE
 from app.flags import canary_flag, flag_for
 from app.llm import run_llm
 from app.pdfcheck import MAX_BYTES, PdfRejected, check_pdf
-from app.ratelimit import BUSY_IN_FLIGHT_MESSAGE, RateLimiter, slow_down_message
+from app.ratelimit import BUSY_IN_FLIGHT_MESSAGE, SLOW_DOWN_MESSAGE, RateLimiter, slow_down_message
 from app.render import md, md_inline, parse_json, pretty_json
 from app.settings import get_settings, load_providers
 from app.i18n import t
@@ -247,9 +247,9 @@ def limited(request: Request, team: Team, ch: Challenge) -> str | None:
     limiter: RateLimiter = request.app.state.limiter
     key = (team.id, ch.id)
     if limiter.lock(key).locked():
-        return BUSY_IN_FLIGHT_MESSAGE
+        return t(BUSY_IN_FLIGHT_MESSAGE)
     wait = limiter.hit(key)
-    return slow_down_message(wait) if wait is not None else None
+    return t(SLOW_DOWN_MESSAGE, seconds=wait) if wait is not None else None
 
 
 def page(request: Request, name: str, ctx: dict, team: Team | None = None, session: Session | None = None):
@@ -285,12 +285,19 @@ def create_team(request: Request, name: str = Form(""), session: Session = Depen
         activity.record(request, "team_create_failed", name=name, reason="bad name")
         return page(request, "join.html", {"error": t("Team name must be 1–{n} characters.", n=auth.MAX_TEAM_NAME),
                                            "name": name, "code": ""})
-    team = Team(name=name, join_code=auth.new_join_code(session))
-    session.add(team)
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
+    team = None
+    for _ in range(3):  # an id clash (two teams created at once right after Reset all) just retries
+        team = Team(id=next_team_id(session), name=name, join_code=auth.new_join_code(session))
+        session.add(team)
+        try:
+            session.commit()
+            break
+        except IntegrityError:
+            session.rollback()
+            team = None
+            if session.exec(select(Team.id).where(Team.name == name)).first() is not None:
+                break
+    if team is None:
         activity.record(request, "team_create_failed", name=name, reason="name taken")
         return page(request, "join.html", {"error": t("That team name is taken. Ask your teammates for the join code."),
                                            "name": name, "code": ""})
@@ -393,6 +400,7 @@ async def chat(cid: str, request: Request, message: str = Form(""), team: Team =
         activity.record(request, "chat_limited", team, ch.id, msg=text, notice=notice)
         return partial(request, "_chat_notice.html", {"ch": ch, "user_text": text, "notice": notice})
 
+    scoreboard.record_view(session, team.id, ch.id)  # a script that never opens the page still starts the fast-solve clock
     limiter: RateLimiter = request.app.state.limiter
     async with limiter.lock((team.id, ch.id)):
         limiter.in_flight += 1
@@ -415,6 +423,7 @@ def submit_flag(cid: str, request: Request, flag: str = Form(""), team: Team = D
     if not value:
         activity.record(request, "flag_empty", team, ch.id)
         return partial(request, "_submit_result.html", {"ch": ch, "result": "empty"})
+    scoreboard.record_view(session, team.id, ch.id)  # no page view at all = solved "instantly" (fast solve)
     correct = value == flag_for(ch, team.id)
     signal = "" if correct else flag_signal(session, ch, value, team.id)
     no_activity = correct and not scoreboard.has_activity(session, team.id, ch.id)
@@ -483,7 +492,7 @@ def edit_kb(cid: str, request: Request, article_id: str = Form(""), body: str = 
     try:
         row = state.update_kb(session, team.id, ch, article_id, body)
     except state.StateError as e:
-        return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, error=t(str(e))))
+        return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, error=t(e.template, **e.kw)))
     return partial(request, "_attacker_kb.html", surface_ctx(session, team.id, ch, notice=t("Saved “{title}” ✅", title=row.title)))
 
 
@@ -499,7 +508,7 @@ def publish_plugin(cid: str, request: Request, plugin_id: str = Form(""), descri
     try:
         row = state.update_plugin(session, team.id, ch, plugin_id, description)
     except state.StateError as e:
-        return partial(request, "_attacker_plugin.html", surface_ctx(session, team.id, ch, error=t(str(e))))
+        return partial(request, "_attacker_plugin.html", surface_ctx(session, team.id, ch, error=t(e.template, **e.kw)))
     return partial(request, "_attacker_plugin.html", surface_ctx(
         session, team.id, ch, notice=t("Update to “{title}” published ✅ It auto-installs at Siam Bigfish Corp.", title=row.title)))
 
@@ -517,7 +526,7 @@ def submit_ticket(cid: str, request: Request, title: str = Form(""), description
         try:
             state.upsert_player_ticket(session, team.id, ch, title, description)
         except state.StateError as e:
-            error = t(str(e))
+            error = t(e.template, **e.kw)
     ctx = surface_ctx(session, team.id, ch, notice=None if error else t("Ticket submitted ✅"), error=error)
     if error:
         ctx["draft"] = {"title": title, "description": description}
@@ -534,7 +543,7 @@ async def upload_pdf(cid: str, request: Request, file: UploadFile = File(...), t
         check = check_pdf(data)
     except PdfRejected as e:
         activity.record(request, "pdf_rejected", team, ch.id, file=file.filename, size=len(data), reason=str(e))
-        return partial(request, "_attacker_pdf.html", surface_ctx(session, team.id, ch, error=t(str(e))))
+        return partial(request, "_attacker_pdf.html", surface_ctx(session, team.id, ch, error=t(e.template, **e.kw)))
     name = (Path(file.filename or "request.pdf").name or "request.pdf")[:MAX_FILENAME]
     activity.record(request, "pdf_upload", team, ch.id, file=name, size=len(data), pages=check.pages,
                     hidden_spans=check.hidden_spans_count, caught_by_human=check.caught_by_human,
@@ -556,6 +565,7 @@ async def run_victim(cid: str, request: Request, team: Team = Depends(team_dep),
         resp = partial(request, "_victim_notice.html", {"notice": notice})
         resp.headers["HX-Reswap"] = "none"  # keep the current Victim POV; the notice swaps in out-of-band
         return resp
+    scoreboard.record_view(session, team.id, ch.id)
     limiter: RateLimiter = request.app.state.limiter
     async with limiter.lock((team.id, ch.id)):
         limiter.in_flight += 1

@@ -33,8 +33,12 @@ class RateLimiter:
         return None
 
 
+SLOW_DOWN_MESSAGE = "Slow down, try again in {seconds} seconds"
+
+
 def slow_down_message(seconds: int) -> str:
-    return f"Slow down 🙂 try again in {seconds} seconds"
+    """English text (logs); the UI translates SLOW_DOWN_MESSAGE itself (app/main.py `limited`)."""
+    return SLOW_DOWN_MESSAGE.format(seconds=seconds)
 
 
-BUSY_IN_FLIGHT_MESSAGE = "Slow down 🙂 wait for the current reply first"
+BUSY_IN_FLIGHT_MESSAGE = "Slow down, wait for the current reply first"

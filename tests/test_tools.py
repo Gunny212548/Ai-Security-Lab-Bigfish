@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app import state
-from app.challenges import KNOWN_TOOLS
+from app.challenges import KNOWN_TOOLS, TOOL_PARAMS
 from app.tools import TOOLS, ToolContext, ToolError, execute_tool, tool_schemas
 
 
@@ -14,6 +14,7 @@ def ctx(session, team, ch, user=None):
 
 def test_registry_matches_loader():
     assert set(TOOLS) == KNOWN_TOOLS
+    assert {n: frozenset(t.params) for n, t in TOOLS.items()} == TOOL_PARAMS  # win.arg_match is checked against it
 
 
 def test_schemas_are_openai_function_tools():

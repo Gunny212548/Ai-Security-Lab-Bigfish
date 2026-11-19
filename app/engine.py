@@ -7,7 +7,7 @@ indirect: (I3 human check) -> render prompt with team data -> LLM as victim -> o
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Awaitable, Callable
 
 from sqlmodel import Session
@@ -21,7 +21,7 @@ from app.llm import LLMResult, run_llm
 from app.settings import Settings, get_settings
 from app.tools import ToolContext, ToolTraceEntry
 from app.win import UploadState, WinInput, check_win
-from app.xray import XRayMessage, build_xray
+from app.xray import XRayMessage, XRayPart, build_xray, mask
 
 LLMFn = Callable[[Challenge, list[dict], ToolContext], Awaitable[LLMResult]]
 
@@ -62,7 +62,7 @@ def _finish(ch: Challenge, result: LLMResult, rendered: state.RenderedPrompt, up
             flag: str) -> TurnResult:
     reply, redacted = apply_output_filter(_output_filter(ch, flag), result.content)
     won = check_win(ch.win, WinInput(output=reply, trace=result.tool_trace, ctx_user=ch.current_user, upload=upload))
-    return TurnResult(
+    out = TurnResult(
         reply=reply,
         won=won,
         flag=flag if won and ch.flag_mode == "on_impact" else None,
@@ -71,6 +71,22 @@ def _finish(ch: Challenge, result: LLMResult, rendered: state.RenderedPrompt, up
         xray=build_xray(result.final_messages, rendered.segments, ch.secrets_for(flag)),
         latency_s=result.latency_s,
         model=result.model,
+    )
+    return _hide_unearned_flag(ch, out, flag)
+
+
+def _hide_unearned_flag(ch: Challenge, out: TurnResult, flag: str) -> TurnResult:
+    """on_impact: the flag is the reward for the impact the win rule checks, so it shows only when the rule fired.
+    A vulnerable tool may still return it for a near miss (I4: reset_password on the wrong account hands back the
+    flag as the "temp password"); without this the X-Ray, the reply or the tool trace would give it away."""
+    if ch.flag_mode != "on_impact" or out.won:
+        return out
+    hide = [flag]
+    return replace(
+        out,
+        reply=mask(out.reply, hide),
+        tool_trace=[replace(e, result=mask(e.result, hide)) for e in out.tool_trace],
+        xray=[replace(m, parts=[XRayPart(p.kind, mask(p.text, hide), p.label) for p in m.parts]) for m in out.xray],
     )
 
 
@@ -95,8 +111,10 @@ async def chat_turn(
     result = await llm(ch, messages, _ctx(session, team_id, ch))
     if result.error:
         # not persisted, so a retry starts from the same history
-        return TurnResult(reply=result.content, error=result.error, tool_trace=result.tool_trace,
-                          xray=build_xray(messages, rendered.segments, ch.secrets_for(flag_for(ch, team_id))), model=result.model)
+        flag = flag_for(ch, team_id)
+        return _hide_unearned_flag(ch, TurnResult(
+            reply=result.content, error=result.error, tool_trace=result.tool_trace,
+            xray=build_xray(messages, rendered.segments, ch.secrets_for(flag)), model=result.model), flag)
 
     out = _finish(ch, result, rendered, None, flag_for(ch, team_id))
     turns = [("user", user_text)]
@@ -125,8 +143,10 @@ async def victim_run(session: Session, team_id: int, ch: Challenge, *, llm: LLMF
     messages = [{"role": "system", "content": rendered.text}, {"role": "user", "content": ch.victim.prompt}]
     result = await llm(ch, messages, _ctx(session, team_id, ch))
     if result.error:
-        return TurnResult(reply=result.content, error=result.error, tool_trace=result.tool_trace,
-                          xray=build_xray(messages, rendered.segments, ch.secrets_for(flag_for(ch, team_id))), model=result.model)
+        flag = flag_for(ch, team_id)
+        return _hide_unearned_flag(ch, TurnResult(
+            reply=result.content, error=result.error, tool_trace=result.tool_trace,
+            xray=build_xray(messages, rendered.segments, ch.secrets_for(flag)), model=result.model), flag)
 
     out = _finish(ch, result, rendered, upload, flag_for(ch, team_id))
     _save_victim_run(session, team_id, ch, out)

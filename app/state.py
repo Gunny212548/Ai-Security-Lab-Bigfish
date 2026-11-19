@@ -29,7 +29,11 @@ NO_ATTACHMENT = "(no attachment)"
 
 
 class StateError(ValueError):
-    """Invalid attacker-surface input; message is player-facing."""
+    """Invalid attacker-surface input; message is player-facing. `template` + `kw` let the UI translate it."""
+
+    def __init__(self, template: str, **kw: object):
+        super().__init__(template.format(**kw) if kw else template)
+        self.template, self.kw = template, kw
 
 
 def _fill(text: str, flag: str) -> str:
@@ -168,7 +172,7 @@ def update_plugin(session: Session, team_id: int, ch: Challenge, plugin_id: str,
     if seed is None:
         raise StateError("Plugin not found in the Plugin Hub")
     if not seed.editable:
-        raise StateError(f"You can only publish updates to your own plugin, not {seed.vendor}'s")
+        raise StateError("You can only publish updates to your own plugin, not {vendor}'s", vendor=seed.vendor)
     row = session.exec(select(TeamKB).where(TeamKB.team_id == team_id, TeamKB.challenge_id == ch.id,
                                             TeamKB.article_id == plugin_id)).first()
     if row is None:

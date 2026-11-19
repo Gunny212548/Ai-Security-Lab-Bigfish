@@ -124,7 +124,7 @@
   <h2 class="mb-1 text-lg font-semibold">Submissions <span class="text-sm font-normal text-slate-400">(latest {{ submissions | length }})</span></h2>
   <p class="mb-2 text-sm text-slate-400">⚠️ = correct flag from a team with no chat or victim run on that challenge: maybe a shared flag.
     ("New chat" keeps the old turns for this check.) {% if flagged %}<strong class="text-amber-300" data-flagged-count>{{ flagged }} flagged.</strong>{% endif %}
-    <br>⚡ = solved less than {{ fast_s }} s after the team first opened the challenge: maybe an AI agent played it
+    <br>⚡ = solved less than {{ fast_s }} s after the team first opened (or first used) the challenge: maybe an AI agent played it
     (<code>FAST_SOLVE_SECONDS</code> in .env). {% if fast %}<strong class="text-amber-300" data-fast-count>{{ fast }} fast.</strong>{% endif %}
     <br>🤖 = the hidden canary flag, which only an AI agent (or a chatbot fed this site's page text) would submit.
     {% if canaries %}<strong class="text-rose-300" data-canary-count>{{ canaries }} canary.</strong>{% endif %}

@@ -14,9 +14,17 @@ from typing import Annotated, Any, Literal, Union
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-# Tool names implemented in app/tools.py (SPEC §6.3). Kept here so the loader has no
-# dependency on the engine; tests assert this stays in sync with tools.py once it exists.
-KNOWN_TOOLS = frozenset({"get_ticket", "reset_password", "forward_email", "reply_email", "run_sql", "query_helpdesk_db"})
+# Tools implemented in app/tools.py (SPEC §6.3) and their parameters. Kept here so the loader has no
+# dependency on the engine; tests/test_tools.py asserts this stays in sync with tools.TOOLS.
+TOOL_PARAMS: dict[str, frozenset[str]] = {
+    "get_ticket": frozenset({"ticket_id"}),
+    "reset_password": frozenset({"username"}),
+    "forward_email": frozenset({"email_id", "to"}),
+    "reply_email": frozenset({"email_id", "body"}),
+    "run_sql": frozenset({"query"}),
+    "query_helpdesk_db": frozenset({"query", "override_code"}),
+}
+KNOWN_TOOLS = frozenset(TOOL_PARAMS)
 
 PLACEHOLDERS = frozenset({"FLAG", "KB", "TICKETS", "INBOX", "ATTACHMENT", "PLUGINS", "CURRENT_USER"})
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Za-z_]+)\s*\}\}")
@@ -418,6 +426,11 @@ class Challenge(_Strict):
         w = self.win
         if isinstance(w, WinToolCalled) and w.tool not in self.tools:
             errors.append(f"win.tool '{w.tool}' is not in this challenge's tools")
+        if isinstance(w, WinToolCalled) and w.tool in TOOL_PARAMS:
+            bad = sorted(set(w.arg_match) - TOOL_PARAMS[w.tool])
+            if bad:  # a typo here makes the challenge unwinnable
+                errors.append(f"win.arg_match {bad}: '{w.tool}' has no such parameter "
+                              f"(it takes {sorted(TOOL_PARAMS[w.tool])})")
         if isinstance(w, WinToolCallsAtLeast):
             if not self.tools:
                 errors.append("win type 'tool_calls_at_least' needs tools")
@@ -431,6 +444,8 @@ class Challenge(_Strict):
             errors.append("win type 'json_approval_hidden' requires attacker_surface: pdf_upload")
         if isinstance(w, WinJsonRankFirst) and self.attacker_surface != "ticket_form":
             errors.append("win type 'json_rank_first' requires attacker_surface: ticket_form")
+        if isinstance(w, WinJsonRankFirst) and w.player_id.strip().upper() != PLAYER_TICKET_ID:
+            errors.append(f"win.player_id must be '{PLAYER_TICKET_ID}' (the id of the ticket the player submits)")
 
         # flag
         if self.flag_mode == "on_impact" and isinstance(w, WinNone):
@@ -532,6 +547,9 @@ def load_challenges(directory: Path, providers: set[str] | None = None) -> dict[
             continue
         except yaml.YAMLError as e:
             problems.append(f"  - {path.name}: invalid YAML: {e}")
+            continue
+        except UnicodeDecodeError as e:
+            problems.append(f"  - {path.name}: not valid UTF-8 (save the file as UTF-8): {e}")
             continue
         if ch.id != path.stem:
             problems.append(f"  - {path.name}: id '{ch.id}' must match file name '{path.stem}'")

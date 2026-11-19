@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import UniqueConstraint, inspect, text
+from sqlalchemy import UniqueConstraint, func, inspect, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
@@ -146,6 +146,7 @@ class AppFlag(SQLModel, table=True):
 
 
 INDIRECT_UNLOCKED = "indirect_unlocked"
+TEAM_ID_FLOOR = "team_id_floor"  # highest team id ever handed out before the last Reset all
 
 
 # --- engine / session -------------------------------------------------------
@@ -220,10 +221,24 @@ def set_flag(session: Session, key: str, value: str) -> None:
     session.commit()
 
 
+def next_team_id(session: Session) -> int | None:
+    """Id for a new team, or None to let SQLite pick (max id + 1).
+
+    Per-team flags derive from the team id (app/flags.py). SQLite reuses ids once "Reset all" has emptied the team
+    table, so the first team after a reset would get id 1 again, and with it the flags team 1 found in an earlier
+    session. Ids therefore keep counting up from the highest one handed out before the reset."""
+    floor = int(get_flag(session, TEAM_ID_FLOOR, "0") or 0)
+    top = session.exec(select(func.max(Team.id))).one() or 0
+    return floor + 1 if top < floor else None
+
+
 def reset_all(session: Session) -> None:
     """Admin "Reset all": delete every team and everything they did, and lock the Indirect track again."""
+    top = session.exec(select(func.max(Team.id))).one() or 0
+    floor = max(top, int(get_flag(session, TEAM_ID_FLOOR, "0") or 0))
     for table in reversed(SQLModel.metadata.sorted_tables):  # children before team
         if table.name != AppFlag.__tablename__:
             session.exec(table.delete())
     session.commit()
     set_flag(session, INDIRECT_UNLOCKED, "0")
+    set_flag(session, TEAM_ID_FLOOR, str(floor))

@@ -4,6 +4,7 @@ Per-team flags: every team gets its own variant of each flag, `bigfish{<base>_<6
 APP_SECRET, the challenge id and the team id. A flag copied from another team, or the base flag from WRITEUP.md /
 the YAML, is rejected and shows up on /admin with who it came from. Turn off with PER_TEAM_FLAGS=false.
 Changing APP_SECRET mid-event changes every flag: data already seeded for existing teams keeps the old ones.
+Team ids never repeat across "Reset all" (db.next_team_id), so a flag from an earlier session stays invalid.
 
 Canary: a flag that appears only in text hidden from human eyes on every page (base.html), addressed to AI agents.
 Nobody can find it by playing; a team that submits it almost certainly let an agent (or a chatbot fed the page) act.

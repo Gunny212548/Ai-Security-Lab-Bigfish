@@ -26,6 +26,7 @@ JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 JOIN_CODE_LEN = 6
 MAX_TEAM_NAME = 40
 DEFAULT_SECRET = "change-me"
+MAX_ID_DIGITS = 18  # < 2**63, the largest SQLite INTEGER
 
 
 def _mac(message: str, secret: str) -> str:
@@ -41,7 +42,9 @@ def parse(value: str | None) -> int | None:
     if not value or "." not in value:
         return None
     raw_id = value.split(".", 1)[0]
-    return int(raw_id) if raw_id.isascii() and raw_id.isdigit() else None
+    if not (raw_id.isascii() and raw_id.isdigit()) or len(raw_id) > MAX_ID_DIGITS:
+        return None  # too long for SQLite's INTEGER (or Python's int()): a forged cookie, not a crash
+    return int(raw_id)
 
 
 def verify(value: str | None, join_code: str, secret: str) -> int | None:
