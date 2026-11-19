@@ -56,11 +56,14 @@ The admin page shows a warning while `APP_SECRET` or `ADMIN_PASSWORD` is still `
 docker compose up -d --build
 docker compose exec app python scripts/prewarm.py      # must print "All providers answered."
 ```
-Open http://localhost:8000 on the server itself. Players use https://lab.bigfishai.lat: Caddy (`Caddyfile`)
-gets the TLS certificate, asks for the basic-auth login, then proxies to the app. Port 8000 is bound to
-127.0.0.1 only, so nobody can skip the login. The DNS A record must point at the server and ports 80/443
-must be open. New password: `docker compose exec caddy caddy hash-password`, paste the hash into `Caddyfile`,
-then `docker compose restart caddy`. All 9 challenges were calibrated on Groq `openai/gpt-oss-120b` (see §3).
+Open http://localhost:8000 on the server itself. Players use https://lab.bigfishai.lat:`PUBLIC_PORT`: Caddy
+(`Caddyfile`, built from `caddy/`) gets the TLS certificate, asks for the basic-auth login, then proxies to the
+app. Port 8000 is bound to 127.0.0.1 only, so nobody can skip the login. The ISP blocks inbound 80/443, so the
+certificate comes from a DNS-01 challenge through the Porkbun API: set `PUBLIC_PORT`, `PORKBUN_API_KEY` and
+`PORKBUN_API_SECRET_KEY` in `.env`, turn on API Access for the domain in Porkbun, and forward the same port number
+from the router to the server. The DNS A record must point at the router's public IP. Check with
+`docker compose logs caddy` ("certificate obtained successfully"). New password:
+`docker compose exec caddy caddy hash-password`, paste the hash into `Caddyfile`, then `docker compose restart caddy`. All 9 challenges were calibrated on Groq `openai/gpt-oss-120b` (see §3).
 
 **Capacity:** Groq's free tier allows about 8K tokens/min and 200K tokens/day for this model, roughly 130–200 chat
 turns per day across all teams. That is not enough for a full workshop: use the paid Dev Tier on the day.
@@ -152,7 +155,7 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 - [ ] `/admin` → **Reset all** (type `RESET`) to remove test teams. Teams created before
       per-team flags (or before an `APP_SECRET` change) hold old flags in their data, so reset them
 - [ ] Run `prewarm.py` again
-- [ ] Open https://lab.bigfishai.lat from a phone on the guest Wi-Fi (login prompt, then the app); give players the basic-auth login
+- [ ] Open https://lab.bigfishai.lat:<PUBLIC_PORT> from a phone on the guest Wi-Fi (login prompt, then the app); give players the basic-auth login
 - [ ] Projector: open `/scoreboard`. Organizer laptop: open `/admin`. Keep the Solutions panels collapsed on screen
 
 **During**
