@@ -22,7 +22,7 @@ Learning features: **X-Ray** (the exact prompt the LLM got, secrets masked), **V
 |---|---|
 | `/` → `/board` → `/c/<id>` | Players (team cookie; teammates join with the 6-character code in the header) |
 | `/scoreboard` | Public, refreshes every 10 s, 🩸 first blood. Put it on the projector |
-| `/admin` | Organizers (`ADMIN_PASSWORD`): unlock Indirect, Reset all, solves, submissions, ⚠ flag-sharing and ⚡ fast-solve warnings, solutions |
+| `/admin` | Organizers (`ADMIN_PASSWORD`): Reset all, solves, submissions, ⚠ flag-sharing and ⚡ fast-solve warnings, solutions |
 
 ---
 
@@ -144,7 +144,7 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 - [ ] Check Groq's rate limits/quotas against ~10 teams × 6 req/min
 
 **1 hour before**
-- [ ] `/admin` → **Reset all** (type `RESET`) to remove test teams. This also locks Indirect. Teams created before
+- [ ] `/admin` → **Reset all** (type `RESET`) to remove test teams. Teams created before
       per-team flags (or before an `APP_SECRET` change) hold old flags in their data, so reset them
 - [ ] Run `prewarm.py` again
 - [ ] Find the URL players will use (`http://<your-LAN-IP>:8000`); check it from a phone on the guest Wi-Fi
@@ -152,7 +152,7 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 
 **During**
 - [ ] Teams create a team on `/`; teammates join with the code in the header (same team = shared chat & state)
-- [ ] When you reach the Indirect part: `/admin` → **🔓 Unlock Indirect** (players refresh the board)
+- [ ] Both tracks are open from the start (there is no Indirect lock). Tell teams when to move on to Indirect
 - [ ] Announce the rules at the start (they are not shown on the site): asking an AI chatbot for ideas is fine,
       **AI agents playing for a team are not**; hints cost points; New chat is the only reset
 - [ ] ⚡ on a submission = solved less than `FAST_SOLVE_SECONDS` after the team first opened (or first used) the challenge (time and

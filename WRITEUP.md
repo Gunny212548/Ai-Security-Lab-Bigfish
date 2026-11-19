@@ -45,7 +45,7 @@ Codes and names follow https://genai.owasp.org/llm-top-10/ (2025 list).
 - **Direct track (D5–D9):** players chat with BigfishDesk themselves. They are the employee `somchai`.
 - **Indirect track (I1–I4):** players never talk to the AI. They plant a payload in data the AI will read
   (a KB article, a ticket, a PDF, a plugin update), then press the button that makes an employee use the AI. The win happens in
-  the *victim's* session. This track is locked until the organizer unlocks it.
+  the *victim's* session. Both tracks are open from the start; the run sheet says when to move on.
 - **X-Ray** shows the exact prompt the model received. Flags and secrets inside the system prompt are masked as
   `████████`; tool results are shown unmasked because the impact has already happened.
 - **Win detection is deterministic code, never the LLM.** Two flag modes:
@@ -112,7 +112,7 @@ Maximum score: **2,050**. A team that solves everything with every hint open sti
 |---|---|---|
 | 0:00–0:15 | Intro | What an LLM app is, prompt injection in one slide, the OWASP LLM Top 10. Demo X-Ray on D5 without solving it. Announce the rules, which are not on the site: AI chatbots for ideas are fine, AI agents playing are not; hints cost points; New chat is the only reset. |
 | 0:15–0:55 | Direct track | D5 → D6 → D7 for everyone. D8 and D9 are for teams that finish early. Walk the room; use the nudges below before teams spend hints. |
-| 0:55 | Unlock Indirect | `/admin` → 🔓 Unlock Indirect. Tell teams to refresh the board. |
+| 0:55 | Move on to Indirect | Tell teams to switch to the Indirect track (it is open from the start). |
 | 1:00–1:40 | Indirect track | I1 is the easiest start. Teams still on D8/D9 can keep going. |
 | 1:40–2:00 | Debrief | Scoreboard on the projector, then the five themes in the debrief guide below, one challenge as the example for each. |
 
@@ -1237,7 +1237,6 @@ of MCP servers, where a tool's description carries instructions to the agent.
 | Flag is in X-Ray but not in the reply (D8, D9) | The model declined to repeat it | Expected. Tool results in X-Ray count. |
 | Team pasted a flag but it's "wrong" | Extra characters, the flag of another challenge, or a flag from another team / the write-up | Flags are exact and case-sensitive; spaces at the ends are trimmed. Check `/admin`: 📄 and 🔁 mean the flag came from somewhere else. |
 | ⚠ "no activity" on a correct submission | Flag sharing, or a team that solved it from another teammate's laptop | Chat turns are kept after **New chat**, so this is no longer caused by resetting. Ask before acting. |
-| Indirect challenges show 🔒 | Not unlocked | `/admin` → 🔓 Unlock Indirect; players refresh. |
 
 ---
 
@@ -1264,8 +1263,8 @@ submitting another team's variant is marked 🔁 with that team's name. The walk
 
 ## Organizer notes
 
-- **Unlock the Indirect track** from the admin page once most teams have finished D5–D7. D8 and D9 are the hardest
-  challenges; strong teams can keep working on them after the unlock.
+- **Move teams on to the Indirect track** once most have finished D5–D7. It is open from the start, so fast teams
+  may already be there. D8 and D9 are the hardest challenges; strong teams can keep working on them.
 - **AI agents:** the rule is "AI chatbots for ideas are fine, AI agents playing for you are not". Nothing can block an
   agent completely. The site does not show the rule, so announce it at the start (with the scoring rules). Three
   signals on `/admin`:
