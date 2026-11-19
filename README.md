@@ -44,7 +44,7 @@ Edit `.env`:
 | `GROQ_API_KEY` | For `cloud`. Free key at https://console.groq.com. Several keys, comma-separated (`k1,k2,k3`): the app uses the first and switches to the next when one is rate-limited (429), used up for the day, or rejected; a spent key rests for as long as Groq's `retry-after` says. `prewarm.py` checks every key. |
 | `LLM_TEMPERATURE`, `LLM_SEED`, `LLM_MAX_TOKENS`, `HISTORY_TURNS` | Defaults are calibrated; leave them |
 | `RATE_LIMIT_PER_MIN` | LLM requests per team per challenge per minute (default 6) |
-| `FAST_SOLVE_SECONDS` | `/admin` marks a correct flag with ⚡ when it came faster than this after the team first opened the challenge (default 90) |
+| `FAST_SOLVE_SECONDS` | `/admin` marks a correct flag with ⚡ when it came faster than this after the team first opened (or first used) the challenge (default 90) |
 | `PER_TEAM_FLAGS` | `true` (default): every team gets its own flag variant, `bigfish{<base>_<6 hex>}`, so flags can't be shared or copied from the write-up |
 
 The admin page shows a warning while `APP_SECRET` or `ADMIN_PASSWORD` is still `change-me`.
@@ -155,7 +155,7 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 - [ ] When you reach the Indirect part: `/admin` → **🔓 Unlock Indirect** (players refresh the board)
 - [ ] Announce the rules at the start (they are not shown on the site): asking an AI chatbot for ideas is fine,
       **AI agents playing for a team are not**; hints cost points; New chat is the only reset
-- [ ] ⚡ on a submission = solved less than `FAST_SOLVE_SECONDS` after the team first opened the challenge (time and
+- [ ] ⚡ on a submission = solved less than `FAST_SOLVE_SECONDS` after the team first opened (or first used) the challenge (time and
       attempt count are in the row). Typical for an agent, or for a team that got the answer elsewhere. Go and talk to them
 - [ ] ⚠ "no activity" on a submission = correct flag but the team never chatted or ran the victim on that
       challenge. Could be flag sharing (chat turns survive **New chat**, so it isn't caused by restarting). Ask before you act
@@ -172,6 +172,9 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 
 **After**
 - [ ] Results live in `data/bigfishdesk.db` (SQLite). Copy it if you want them, then Reset all
+- [ ] Next session on the same machine: **Reset all** is enough (team ids, and so per-team flags, keep counting up
+      across resets). If you delete the database file instead, also change `APP_SECRET`, or the new teams get the
+      old teams' flags
 
 ---
 
