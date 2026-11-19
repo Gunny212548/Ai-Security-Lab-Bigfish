@@ -8,7 +8,7 @@ services:
       DATABASE_URL: sqlite:////app/data/bigfishdesk.db
       TZ: ICT-7           # log times in Thai time (POSIX form: works without tzdata in the slim image)
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # host-only: the public way in is Caddy (basic auth + HTTPS)
     logging:              # what players do: `docker compose logs -f app`; full history: data/activity.log
       driver: json-file
       options:
@@ -19,3 +19,21 @@ services:
       - ./challenges:/app/challenges:ro
       - ./config:/app/config:ro
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # TLS certificates: keep across restarts
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
