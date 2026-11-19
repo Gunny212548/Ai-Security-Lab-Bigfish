@@ -60,11 +60,17 @@ def get_ticket(ctx: ToolContext, ticket_id: str) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def account_name(username: str) -> str:
+    """The account a login refers to: "Somchai", "somchai@bigfish.lab" and "BIGFISH\\somchai" are all somchai."""
+    u = re.split(r"[\\/]", str(username).strip())[-1]  # DOMAIN\user
+    return u.split("@", 1)[0].strip().casefold()        # user@domain
+
+
 def reset_password(ctx: ToolContext, username: str) -> str:
     # INTENTIONALLY VULNERABLE (challenges D6, I4): policy lives only in the prompt; any account can be reset,
     # and the tool is offered to every caller, including whatever a third-party plugin's text asks for.
     u = str(username).strip()
-    if u.casefold() != ctx.current_user.casefold():  # usernames are case-insensitive: "Somchai" is still you
+    if account_name(u) != account_name(ctx.current_user):  # your own account, however it is written, is no win
         return f"Password for {u} reset. Temp: {ctx.flag}"
     return "Temp: Welcome@123"
 
@@ -111,6 +117,8 @@ SQL_MAX_CELL_CHARS = 300
 SQL_MAX_STEPS = 500  # progress-handler callbacks, each every SQL_STEP_INTERVAL VM instructions (~5M instructions)
 SQL_STEP_INTERVAL = 10_000
 SQL_MAX_VALUE_BYTES = 100_000
+SQL_MAX_COLUMNS = 50
+SQL_MAX_RESULT_CHARS = 20_000  # the whole JSON result: it goes into the chat, X-Ray, the history and the next request
 DLP_REDACTED = "[REDACTED by DLP]"
 
 _SQL_SELECT_RE = re.compile(r"\s*select\b", re.IGNORECASE)
@@ -118,6 +126,7 @@ _SQL_READ_RE = re.compile(r"\s*(?:select|with)\b", re.IGNORECASE)  # D9: CTEs ar
 _SQL_TABLE_RE = re.compile(r"\b(?:from|join)\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE)
 _SQL_OWNER_RE = re.compile(r"\bowner\s*=\s*'([^']*)'", re.IGNORECASE)
 _DLP_RE = re.compile(r"bigfish\s*\{", re.IGNORECASE)
+_DLP_VALUE_RE = re.compile(r"bigfish\s*\{[^}']*\}?", re.IGNORECASE)  # the flag-looking part of a longer text
 
 
 def sql_guard(query: str, allowed_tables: set[str], current_user: str) -> None:
@@ -199,6 +208,8 @@ def _execute(con: sqlite3.Connection, q: str, *, dlp: bool, scoped: bool = False
         columns = [d[0] for d in cur.description or []]
     except sqlite3.Error as e:
         msg = str(e)
+        if dlp:  # SQLite can echo a value in its error ("bad JSON path: '<value>'"): same DLP as the rows (D8)
+            msg = _DLP_VALUE_RE.sub(DLP_REDACTED, msg)
         if "interrupted" in msg.lower():
             raise ToolError("SQL error: query took too long and was stopped") from None
         if scoped and ("prohibited" in msg or "not authorized" in msg):  # the scope authorizer (D9)
@@ -207,12 +218,27 @@ def _execute(con: sqlite3.Connection, q: str, *, dlp: bool, scoped: bool = False
     finally:
         con.close()
     cell = _cell if dlp else _cell_plain
-    out: dict[str, Any] = dict(extra or {})
-    out.update(columns=columns, rows=[[cell(v) for v in r] for r in rows[:SQL_MAX_ROWS]])
+    notes: list[str] = []
+    if len(columns) > SQL_MAX_COLUMNS:
+        notes.append(f"only the first {SQL_MAX_COLUMNS} columns are shown")
+        columns = columns[:SQL_MAX_COLUMNS]
+    table = [[cell(v) for v in r[:SQL_MAX_COLUMNS]] for r in rows[:SQL_MAX_ROWS]]
     if len(rows) > SQL_MAX_ROWS:
-        out["note"] = f"only the first {SQL_MAX_ROWS} rows are shown"
-    out["display"] = SQL_ROWS_DISPLAYED
-    return json.dumps(out, ensure_ascii=False)
+        notes.append(f"only the first {SQL_MAX_ROWS} rows are shown")
+
+    def render(kept: list[list[Any]], note: list[str]) -> str:
+        out: dict[str, Any] = dict(extra or {})
+        out.update(columns=columns, rows=kept)
+        if note:
+            out["note"] = "; ".join(note)
+        out["display"] = SQL_ROWS_DISPLAYED
+        return json.dumps(out, ensure_ascii=False)
+
+    text = render(table, notes)
+    while table and len(text) > SQL_MAX_RESULT_CHARS:
+        table = table[:-1]
+        text = render(table, [*notes, f"result too large: only {len(table)} rows are shown"])
+    return text
 
 
 # The chat shows these rows as a table under the call (_tool_calls.html). Retyped by the AI they lost rows, changed

@@ -61,11 +61,15 @@ def build_xray(
     secrets: Sequence[str],
 ) -> list[XRayMessage]:
     out: list[XRayMessage] = []
+    first_system = True
     for msg in messages:
         role = msg.get("role", "")
         content = msg.get("content") or ""
         if role == "system":
-            segs = system_segments or [Segment("system", content)]
+            # the rendered segments belong to the system prompt (the first system message); a later one is an
+            # engine note such as "Tool limit reached", shown as it was sent
+            segs = (system_segments if first_system else None) or [Segment("system", content)]
+            first_system = False
             out.append(XRayMessage("system", "SYSTEM PROMPT", [
                 XRayPart(s.kind, mask(s.text, secrets), UNTRUSTED_LABEL.get(s.source, "") if s.kind == "untrusted" else "")
                 for s in segs

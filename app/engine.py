@@ -75,6 +75,24 @@ def _finish(ch: Challenge, result: LLMResult, rendered: state.RenderedPrompt, up
     return _hide_unearned_flag(ch, out, flag)
 
 
+def _error_turn(ch: Challenge, result: LLMResult, rendered: state.RenderedPrompt, messages: list[dict],
+                flag: str) -> TurnResult:
+    """The LLM call failed. Not persisted, so a retry starts from the same history. X-Ray shows what was sent,
+    including any tool calls that already ran."""
+    shown = result.final_messages or messages
+    return _hide_unearned_flag(ch, TurnResult(
+        reply=result.content, error=result.error, tool_trace=result.tool_trace,
+        xray=build_xray(shown, rendered.segments, ch.secrets_for(flag)), model=result.model), flag)
+
+
+def _won_before_error(ch: Challenge, result: LLMResult, upload: UploadState | None) -> bool:
+    """Tools ran and then the LLM failed (a timeout or a 429 on the next round). Their effect is real (I4: the CFO's
+    password was reset; D7: four lookups were made), so a win rule that looks only at tool calls still counts."""
+    if not result.tool_trace:
+        return False
+    return check_win(ch.win, WinInput(output="", trace=result.tool_trace, ctx_user=ch.current_user, upload=upload))
+
+
 def _hide_unearned_flag(ch: Challenge, out: TurnResult, flag: str) -> TurnResult:
     """on_impact: the flag is the reward for the impact the win rule checks, so it shows only when the rule fired.
     A vulnerable tool may still return it for a near miss (I4: reset_password on the wrong account hands back the
@@ -109,12 +127,8 @@ async def chat_turn(
     messages = [{"role": "system", "content": rendered.text}, *history, {"role": "user", "content": user_text}]
 
     result = await llm(ch, messages, _ctx(session, team_id, ch))
-    if result.error:
-        # not persisted, so a retry starts from the same history
-        flag = flag_for(ch, team_id)
-        return _hide_unearned_flag(ch, TurnResult(
-            reply=result.content, error=result.error, tool_trace=result.tool_trace,
-            xray=build_xray(messages, rendered.segments, ch.secrets_for(flag)), model=result.model), flag)
+    if result.error and not _won_before_error(ch, result, None):
+        return _error_turn(ch, result, rendered, messages, flag_for(ch, team_id))
 
     out = _finish(ch, result, rendered, None, flag_for(ch, team_id))
     turns = [("user", user_text)]
@@ -142,11 +156,8 @@ async def victim_run(session: Session, team_id: int, ch: Challenge, *, llm: LLMF
     rendered = state.render_system_prompt(session, team_id, ch)
     messages = [{"role": "system", "content": rendered.text}, {"role": "user", "content": ch.victim.prompt}]
     result = await llm(ch, messages, _ctx(session, team_id, ch))
-    if result.error:
-        flag = flag_for(ch, team_id)
-        return _hide_unearned_flag(ch, TurnResult(
-            reply=result.content, error=result.error, tool_trace=result.tool_trace,
-            xray=build_xray(messages, rendered.segments, ch.secrets_for(flag)), model=result.model), flag)
+    if result.error and not _won_before_error(ch, result, upload):
+        return _error_turn(ch, result, rendered, messages, flag_for(ch, team_id))
 
     out = _finish(ch, result, rendered, upload, flag_for(ch, team_id))
     _save_victim_run(session, team_id, ch, out)

@@ -87,7 +87,9 @@ def admin_token(password: str, secret: str) -> str:
 
 
 def check_admin_password(given: str, password: str) -> bool:
-    return bool(password) and hmac.compare_digest(given.encode(), password.encode())
+    """Constant-time on digests, so any length works (and a huge form field costs one hash)."""
+    digest = lambda s: hashlib.sha256(s.encode()).digest()  # noqa: E731
+    return bool(password) and hmac.compare_digest(digest(given), digest(password))
 
 
 def is_admin(request: Request) -> bool:

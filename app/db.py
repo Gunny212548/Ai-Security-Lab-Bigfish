@@ -2,7 +2,7 @@
 
 Deviation from §7: TeamKB / TeamTicket / TeamEmail also carry `challenge_id`, because D5 and I2
 both seed tickets and "Reset challenge" must only touch that challenge's data.
-AppFlag is a tiny key/value table for global switches (e.g. indirect track unlock).
+AppFlag is a tiny key/value table for global settings that survive "Reset all" (e.g. the team id floor).
 """
 
 from __future__ import annotations
@@ -145,7 +145,6 @@ class AppFlag(SQLModel, table=True):
     value: str
 
 
-INDIRECT_UNLOCKED = "indirect_unlocked"
 TEAM_ID_FLOOR = "team_id_floor"  # highest team id ever handed out before the last Reset all
 
 
@@ -233,12 +232,11 @@ def next_team_id(session: Session) -> int | None:
 
 
 def reset_all(session: Session) -> None:
-    """Admin "Reset all": delete every team and everything they did, and lock the Indirect track again."""
+    """Admin "Reset all": delete every team and everything they did."""
     top = session.exec(select(func.max(Team.id))).one() or 0
     floor = max(top, int(get_flag(session, TEAM_ID_FLOOR, "0") or 0))
     for table in reversed(SQLModel.metadata.sorted_tables):  # children before team
         if table.name != AppFlag.__tablename__:
             session.exec(table.delete())
     session.commit()
-    set_flag(session, INDIRECT_UNLOCKED, "0")
     set_flag(session, TEAM_ID_FLOOR, str(floor))

@@ -7,7 +7,7 @@ from markupsafe import escape as html_escape
 from sqlmodel import Session, select
 
 from app import auth
-from app.db import INDIRECT_UNLOCKED, ChatTurn, Solve, Submission, Team, TeamTicket, get_engine, set_flag
+from app.db import ChatTurn, Solve, Submission, Team, TeamTicket, get_engine
 from app.llm import BUSY_MESSAGE
 from app.main import app
 from app.ratelimit import RateLimiter
@@ -39,11 +39,6 @@ def use_llm(c: TestClient, *responses):
     fake = FakeClient(*responses)
     c.app.state.llm = llm_with(fake)
     return fake
-
-
-def set_indirect(unlocked: bool) -> None:
-    with Session(get_engine()) as s:
-        set_flag(s, INDIRECT_UNLOCKED, "1" if unlocked else "0")
 
 
 # --- join / session -----------------------------------------------------------------
@@ -124,11 +119,7 @@ def test_board_lists_the_active_challenges(client):
 
 def test_pages_never_leak_flags_or_solutions(client):
     new_team(client)
-    set_indirect(True)
-    try:
-        pages = [client.get("/board").text] + [client.get(f"/c/{cid}").text for cid in client.app.state.challenges]
-    finally:
-        set_indirect(False)
+    pages = [client.get("/board").text] + [client.get(f"/c/{cid}").text for cid in client.app.state.challenges]
     from app.flags import canary_flag
 
     for html in pages:
@@ -140,18 +131,14 @@ def test_pages_never_leak_flags_or_solutions(client):
                 assert str(html_escape(msg)) not in html
 
 
-def test_indirect_track_locked_until_unlocked(client):
+def test_every_challenge_is_open_from_the_start(client):
+    """There is no Indirect lock: both tracks are playable as soon as a team exists."""
     new_team(client)
     html = client.get("/board").text
-    assert "🔒" in html and 'href="/c/i1"' not in html and 'href="/c/d5"' in html
-    assert client.get("/c/i1", follow_redirects=False).headers["location"] == "/board"
-    set_indirect(True)
-    try:
-        html = client.get("/board").text
-        assert 'href="/c/i1"' in html and "🔒" not in html
-        assert client.get("/c/i1").status_code == 200
-    finally:
-        set_indirect(False)
+    for cid in client.app.state.challenges:
+        assert f'href="/c/{cid}"' in html
+        assert client.get(f"/c/{cid}").status_code == 200
+    assert "🔒 Waiting" not in html and client.post("/admin/indirect").status_code == 404
 
 
 def test_unknown_challenge_404(client):

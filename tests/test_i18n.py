@@ -11,7 +11,7 @@ from app.challenges import Challenge
 from app.main import app
 
 from .fakellm import call, text
-from .test_app import new_team, set_indirect, use_llm
+from .test_app import new_team, use_llm
 
 APP = Path(__file__).resolve().parent.parent / "app"
 # _("...") / t("...") with a literal first argument, in templates and Python
@@ -91,14 +91,10 @@ def test_thai_does_not_touch_the_chat(client):
 def test_thai_indirect_panels(client):
     new_team(client)
     thai(client)
-    set_indirect(True)
-    try:
-        page = client.get("/c/i1").text
-        assert "ฝั่งคุณ" in page and "บันทึกหน้า" in page and "ให้ Nok ใช้ AI" in page and "KB อาบยาพิษ" in page
-        r = client.post("/c/i1/kb", data={"article_id": "nope", "body": "x"})
-        assert "ไม่พบบทความนี้ใน KB" in r.text  # server message translated
-    finally:
-        set_indirect(False)
+    page = client.get("/c/i1").text
+    assert "ฝั่งคุณ" in page and "บันทึกหน้า" in page and "ให้ Nok ใช้ AI" in page and "KB อาบยาพิษ" in page
+    r = client.post("/c/i1/kb", data={"article_id": "nope", "body": "x"})
+    assert "ไม่พบบทความนี้ใน KB" in r.text  # server message translated
 
 
 def test_thai_scoreboard_and_errors(client):

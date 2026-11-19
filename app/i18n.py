@@ -115,7 +115,6 @@ TH: dict[str, str] = {
     "🕵️ Indirect Prompt Injection": "🕵️ Indirect Prompt Injection (โจมตีทางอ้อม)",
     "Hide instructions in data the AI reads, then wait for an employee to use it.":
         "ซ่อนคำสั่งไว้ในข้อมูลที่ AI อ่าน แล้วรอให้พนักงานใช้งาน AI",
-    "🔒 Waiting for the organizers to unlock": "🔒 รอผู้จัดปลดล็อก",
     "Difficulty {n}": "ความยาก {n}",
     # challenge page
     "← Challenges": "← โจทย์ทั้งหมด",

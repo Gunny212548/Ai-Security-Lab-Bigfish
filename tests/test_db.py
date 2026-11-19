@@ -3,7 +3,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, select
 
 from app.db import (
-    INDIRECT_UNLOCKED,
     ChatTurn,
     Solve,
     Team,
@@ -71,11 +70,11 @@ def test_per_team_state_rows_roundtrip(session):
 
 
 def test_app_flag_get_set(session):
-    assert get_flag(session, INDIRECT_UNLOCKED) == ""
-    set_flag(session, INDIRECT_UNLOCKED, "1")
-    assert get_flag(session, INDIRECT_UNLOCKED) == "1"
-    set_flag(session, INDIRECT_UNLOCKED, "0")
-    assert get_flag(session, INDIRECT_UNLOCKED) == "0"
+    assert get_flag(session, "some_setting") == ""
+    set_flag(session, "some_setting", "1")
+    assert get_flag(session, "some_setting") == "1"
+    set_flag(session, "some_setting", "0")
+    assert get_flag(session, "some_setting") == "0"
 
 
 def test_init_db_adds_columns_missing_from_an_old_db_file(tmp_path):

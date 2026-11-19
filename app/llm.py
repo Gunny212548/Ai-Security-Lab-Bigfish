@@ -321,7 +321,9 @@ async def run_llm(
                 msg = resp.choices[0].message
                 calls = msg.tool_calls or []
                 answer = not calls or not ch.tools or final
-                content = _first_answer(_clean(msg.content), getattr(msg, "reasoning", None)) if answer else ""
+                content = _clean(msg.content) if answer else ""
+                if content and ch.response_format != "json":  # cutting a JSON verdict would break it (I2, I3)
+                    content = _first_answer(content, getattr(msg, "reasoning", None))
                 ok = (content and not _garbled(content)) or (final and not content)  # empty final: TOOL_LIMIT_MESSAGE
                 if not answer or ok or garbled_retries >= MAX_GARBLED_RETRIES:
                     break

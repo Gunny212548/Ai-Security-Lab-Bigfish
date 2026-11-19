@@ -115,3 +115,33 @@ def recent_submissions(session: Session, limit: int = 200) -> list[tuple[Submiss
     q = (select(Submission, Team.name).join(Team, Team.id == Submission.team_id)
          .order_by(Submission.at.desc(), Submission.id.desc()).limit(limit))
     return list(session.exec(q))
+
+
+def _has_signal(fast_seconds: int):
+    """SQL: the submission carries a /admin marker (⚠ no activity, 🤖 canary, 📄/🔁 leaked flag, ⚡ fast solve)."""
+    fast = (Submission.correct == True) & (Submission.solve_seconds != None) & (Submission.solve_seconds < fast_seconds)  # noqa: E712,E711
+    return (Submission.no_activity == True) | (Submission.signal != "") | fast  # noqa: E712
+
+
+def admin_submissions(session: Session, fast_seconds: int, limit: int = 200) -> list[tuple[Submission, str]]:
+    """The newest `limit` submissions plus every older one with a marker: a flood of wrong guesses (or just a busy
+    workshop) must not push the anti-cheat signals off the admin page. Newest first."""
+    rows = {s.id: (s, name) for s, name in recent_submissions(session, limit)}
+    q = (select(Submission, Team.name).join(Team, Team.id == Submission.team_id)
+         .where(_has_signal(fast_seconds)))
+    for s, name in session.exec(q):
+        rows.setdefault(s.id, (s, name))
+    return sorted(rows.values(), key=lambda r: (r[0].at, r[0].id), reverse=True)
+
+
+def signal_counts(session: Session, fast_seconds: int) -> dict[str, int]:
+    """Admin counters over every submission."""
+    def count(cond) -> int:
+        return session.exec(select(func.count()).select_from(Submission).where(cond)).one()
+    fast = (Submission.correct == True) & (Submission.solve_seconds != None) & (Submission.solve_seconds < fast_seconds)  # noqa: E712,E711
+    return {
+        "flagged": count(Submission.no_activity == True),  # noqa: E712
+        "canaries": count(Submission.signal == "canary"),
+        "leaks": count((Submission.signal != "") & (Submission.signal != "canary")),
+        "fast": count(fast),
+    }

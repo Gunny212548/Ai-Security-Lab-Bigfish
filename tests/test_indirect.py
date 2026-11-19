@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.db import INDIRECT_UNLOCKED, TeamUpload, VictimRun, get_engine, set_flag
+from app.db import TeamUpload, VictimRun, get_engine
 from app.engine import HUMAN_REJECTED_MESSAGE, NO_UPLOAD_MESSAGE
 from app.main import app
 from app.pdfcheck import build_pdf
@@ -16,12 +16,8 @@ from .fakellm import FakeClient, llm_with, text
 @pytest.fixture
 def client():
     with TestClient(app) as c:
-        with Session(get_engine()) as s:
-            set_flag(s, INDIRECT_UNLOCKED, "1")
         c.post("/team/create", data={"name": f"ind-{uuid.uuid4().hex[:8]}"})
         yield c
-        with Session(get_engine()) as s:
-            set_flag(s, INDIRECT_UNLOCKED, "0")
 
 
 def use_llm(c, *responses):
@@ -56,13 +52,6 @@ def test_indirect_pages_render_attacker_panel(client, cid, marker):
 def test_surface_routes_reject_wrong_challenge(client):
     assert client.post("/c/i2/kb", data={"article_id": "kb-pw", "body": "x"}).status_code == 400
     assert client.post("/c/d5/run-victim").status_code == 400
-
-
-def test_locked_indirect_routes_redirect(client):
-    with Session(get_engine()) as s:
-        set_flag(s, INDIRECT_UNLOCKED, "0")
-    r = client.post("/c/i1/run-victim", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/board"
 
 
 # --- I1 KB --------------------------------------------------------------------------

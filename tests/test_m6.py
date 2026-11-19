@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app import auth
-from app.db import INDIRECT_UNLOCKED, Solve, Submission, Team, TeamKB, get_engine, get_flag, reset_all, set_flag
+from app.db import TEAM_ID_FLOOR, Solve, Submission, Team, TeamKB, get_engine, get_flag, reset_all
 from app.main import app
 from app.ratelimit import RateLimiter
 from app.scoreboard import first_bloods, standings
@@ -25,8 +25,6 @@ def client():
         c.app.state.settings = c.app.state.settings.model_copy(update={"admin_password": ADMIN_PW,
                                                                        "app_secret": "test-secret"})
         yield c
-        with Session(get_engine()) as s:
-            set_flag(s, INDIRECT_UNLOCKED, "0")
 
 
 @contextmanager
@@ -131,11 +129,11 @@ def test_admin_requires_login(client):
     from app.flags import canary_flag
 
     assert 'action="/admin/login"' in r.text and "bigfish{" not in r.text.replace(canary_flag(), "")
-    for path, data in (("/admin/indirect", {"unlock": "1"}), ("/admin/reset-all", {"confirm": "RESET"})):
-        r = client.post(path, data=data, follow_redirects=False)
-        assert r.status_code == 303 and r.headers["location"] == "/admin"
+    new_team(client)
+    r = client.post("/admin/reset-all", data={"confirm": "RESET"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/admin"
     with Session(get_engine()) as s:
-        assert get_flag(s, INDIRECT_UNLOCKED) != "1"
+        assert s.exec(select(Team)).first() is not None  # nothing was reset
 
 
 def test_admin_wrong_password_and_forged_cookie(client):
@@ -182,15 +180,12 @@ def test_admin_warns_about_default_secrets(client):
 # --- admin actions ---------------------------------------------------------------------
 
 
-def test_admin_unlocks_and_locks_indirect(client):
+def test_admin_has_no_indirect_lock(client):
     new_team(client)
     login_admin(client)
-    assert 'href="/c/i1"' not in client.get("/board").text
-    r = client.post("/admin/indirect", data={"unlock": "1"})
-    assert 'data-indirect-state="unlocked"' in r.text and "data-notice" in r.text
+    html = client.get("/admin").text
+    assert "Unlock Indirect" not in html and "data-indirect-state" not in html
     assert 'href="/c/i1"' in client.get("/board").text
-    client.post("/admin/indirect", data={"unlock": "0"})
-    assert 'href="/c/i1"' not in client.get("/board").text
 
 
 def test_admin_shows_solutions_teams_and_submissions(client):
@@ -227,16 +222,15 @@ def test_reset_all_needs_confirm_then_wipes_and_old_cookie_dies(client):
     old = new_team(client)
     old_cookie = client.cookies.get(auth.COOKIE)
     login_admin(client)
-    client.post("/admin/indirect", data={"unlock": "1"})
     r = client.post("/admin/reset-all", data={"confirm": "reset please"})
     assert "Nothing was deleted" in r.text and team_id(old)
 
     r = client.post("/admin/reset-all", data={"confirm": "RESET"})
-    assert "Everything was reset" in r.text and 'data-indirect-state="locked"' in r.text
+    assert "Everything was reset" in r.text
     with Session(get_engine()) as s:
         assert s.exec(select(Team)).first() is None and s.exec(select(Solve)).first() is None
 
-    with other_client() as fresh:  # SQLite hands the freed id to the next team...
+    with other_client() as fresh:  # a new team after the reset...
         new_team(fresh)
     client.cookies.clear()
     client.cookies.set(auth.COOKIE, old_cookie)  # ...but the old browser must not land in it
@@ -244,18 +238,15 @@ def test_reset_all_needs_confirm_then_wipes_and_old_cookie_dies(client):
 
 
 def test_reset_all_keeps_app_flags_table(session, make_team):
-    make_team("Z")
-    set_flag(session, INDIRECT_UNLOCKED, "1")
+    tid = make_team("Z")
     reset_all(session)
-    assert get_flag(session, INDIRECT_UNLOCKED) == "0" and session.exec(select(TeamKB)).first() is None
+    assert int(get_flag(session, TEAM_ID_FLOOR)) >= tid and session.exec(select(TeamKB)).first() is None
 
 
 # --- M6 acceptance: two teams concurrently, no shared state ----------------------------
 
 
 def test_two_teams_do_not_see_each_others_state(client):
-    with Session(get_engine()) as s:
-        set_flag(s, INDIRECT_UNLOCKED, "1")
     with other_client() as cb:
         a, b = new_team(client, "red"), new_team(cb, "blue")
 

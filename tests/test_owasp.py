@@ -5,11 +5,9 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
-from sqlmodel import Session
 
 from app import state
 from app.challenges import OWASP_LLM_2025, ChallengeConfigError, WinRule, load_challenges
-from app.db import INDIRECT_UNLOCKED, get_engine, set_flag
 from app.main import app
 from app.tools import ToolTraceEntry
 from app.win import WinInput, check_win
@@ -112,12 +110,8 @@ def test_i4_plugins_seed_render_and_lock(challenges, session, make_team):
 @pytest.fixture
 def client():
     with TestClient(app) as c:
-        with Session(get_engine()) as s:
-            set_flag(s, INDIRECT_UNLOCKED, "1")
         c.post("/team/create", data={"name": f"owasp-{uuid.uuid4().hex[:8]}"})
         yield c
-        with Session(get_engine()) as s:
-            set_flag(s, INDIRECT_UNLOCKED, "0")
 
 
 def use_llm(c, *responses):

@@ -20,8 +20,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import activity, auth, engine, i18n, scoreboard, state
 from app.challenges import OWASP_LLM_2025, PLAYER_TICKET_ID, Challenge, load_challenges
-from app.db import (INDIRECT_UNLOCKED, HintView, Solve, Submission, Team, VictimRun, get_flag, get_session,
-                    get_engine, init_db, next_team_id, reset_all, set_flag)
+from app.db import (HintView, Solve, Submission, Team, VictimRun, get_session, get_engine, init_db, next_team_id,
+                    reset_all)
 from app.filters import BLOCKED_INPUT_MESSAGE
 from app.flags import canary_flag, flag_for
 from app.llm import run_llm
@@ -63,7 +63,6 @@ MAX_TICKET_TITLE = 150
 MAX_TICKET_DESC = 2000
 MAX_FILENAME = 120
 MAX_PLUGIN_DESC = 1000
-MAX_ADMIN_PASSWORD = 200
 ADMIN_LOGIN_PER_MIN = 10
 RESET_ALL_CONFIRM = "RESET"
 SCOREBOARD_REFRESH_S = 10
@@ -154,16 +153,10 @@ def team_dep(request: Request, session: Session = Depends(get_session)) -> Team:
     return auth.require_team(request, session)
 
 
-def indirect_unlocked(session: Session) -> bool:
-    return get_flag(session, INDIRECT_UNLOCKED) == "1"
-
-
 def get_challenge(request: Request, session: Session, cid: str) -> Challenge:
     ch = request.app.state.challenges.get(cid)
     if ch is None:
         raise HTTPException(status_code=404, detail="challenge not found")
-    if ch.track == "indirect" and not indirect_unlocked(session):
-        raise HTTPException(status_code=303, headers={"Location": "/board"})
     return ch
 
 
@@ -340,13 +333,11 @@ def leave_team(request: Request, session: Session = Depends(get_session)):
 @app.get("/board")
 def board(request: Request, team: Team = Depends(team_dep), session: Session = Depends(get_session)):
     challenges: dict[str, Challenge] = request.app.state.challenges
-    unlocked = indirect_unlocked(session)
     tracks = [
         {
             "key": key,
             "name": t(name),
             "desc": t(desc),
-            "locked": key == "indirect" and not unlocked,
             "cards": [public_card(c) for c in challenges.values() if c.track == key],
         }
         for key, name, desc in TRACKS
@@ -425,20 +416,25 @@ def submit_flag(cid: str, request: Request, flag: str = Form(""), team: Team = D
         return partial(request, "_submit_result.html", {"ch": ch, "result": "empty"})
     scoreboard.record_view(session, team.id, ch.id)  # no page view at all = solved "instantly" (fast solve)
     correct = value == flag_for(ch, team.id)
+    new_solve = correct and solve_of(session, team.id, ch.id) is None
     signal = "" if correct else flag_signal(session, ch, value, team.id)
-    no_activity = correct and not scoreboard.has_activity(session, team.id, ch.id)
-    seconds, attempts = scoreboard.solve_stats(session, team.id, ch.id) if correct else (None, 0)
-    session.add(Submission(team_id=team.id, challenge_id=ch.id, value=value, correct=correct,
-                           no_activity=no_activity, solve_seconds=seconds, attempts=attempts, signal=signal))
+    no_activity = new_solve and not scoreboard.has_activity(session, team.id, ch.id)
+    seconds, attempts = scoreboard.solve_stats(session, team.id, ch.id) if new_solve else (None, 0)
     result, awarded = ("canary" if signal == "canary" else "wrong"), None
     if correct:
-        if solve_of(session, team.id, ch.id):
-            result = "already"
-        else:
-            awarded = ch.value_after_hints(len(revealed_hints(session, team.id, ch.id)))
-            session.add(Solve(team_id=team.id, challenge_id=ch.id, points=awarded))
-            result = "correct"
-    session.commit()
+        result = "correct" if new_solve else "already"
+    if new_solve:
+        awarded = ch.value_after_hints(len(revealed_hints(session, team.id, ch.id)))
+        session.add(Solve(team_id=team.id, challenge_id=ch.id, points=awarded))
+    session.add(Submission(team_id=team.id, challenge_id=ch.id, value=value, correct=correct,
+                           no_activity=no_activity, solve_seconds=seconds, attempts=attempts, signal=signal))
+    try:
+        session.commit()
+    except IntegrityError:  # a teammate's submit of the same flag won the race: theirs is the solve
+        session.rollback()
+        no_activity, seconds, attempts, result, awarded = False, None, 0, "already", None
+        session.add(Submission(team_id=team.id, challenge_id=ch.id, value=value, correct=True, signal=""))
+        session.commit()
     activity.record(request, "flag", team, ch.id, value=value, result=result, points=awarded, signal=signal or None,
                     no_activity=no_activity or None, solve_s=seconds)
     return partial(request, "_submit_result.html", {"ch": ch, "result": result, "awarded": awarded,
@@ -612,9 +608,7 @@ def scoreboard_table(request: Request, session: Session = Depends(get_session)):
 # --- admin (M6) ---------------------------------------------------------------------------
 
 ADMIN_MESSAGES = {
-    "unlocked": "Indirect track unlocked ✅ Players see it after refreshing the board.",
-    "locked": "Indirect track locked \U0001f512",
-    "reset": "Everything was reset: all teams, solves, submissions and chats are gone. Indirect is locked.",
+    "reset": "Everything was reset: all teams, solves, submissions and chats are gone.",
 }
 
 
@@ -664,12 +658,13 @@ def admin_ctx(request: Request, session: Session, notice: str | None = None, err
     names = {r.team.id: r.team.name for r in rows}
     bloods = scoreboard.first_bloods(session)
     stats = scoreboard.challenge_stats(session)
-    subs = scoreboard.recent_submissions(session)
+    fast_s = request.app.state.settings.fast_solve_seconds
+    subs = scoreboard.admin_submissions(session, fast_s)
+    signals = scoreboard.signal_counts(session, fast_s)
     return {
         "notice": notice,
         "error": error,
         "warnings": admin_warnings(request),
-        "unlocked": indirect_unlocked(session),
         "rows": rows,
         "columns": [public_card(c) for c in challenges.values()],
         "challenges": [
@@ -682,11 +677,8 @@ def admin_ctx(request: Request, session: Session, notice: str | None = None, err
         "owasp": [(code, name, [c.id for c in challenges.values() if code in c.owasp])
                   for code, name in OWASP_LLM_2025.items()],
         "submissions": subs,
-        "flagged": sum(1 for sub, _ in subs if sub.no_activity),
-        "canaries": sum(1 for sub, _ in subs if sub.signal == "canary"),
-        "leaks": sum(1 for sub, _ in subs if sub.signal and sub.signal != "canary"),
-        "fast_s": request.app.state.settings.fast_solve_seconds,
-        "fast": sum(1 for sub, _ in subs if is_fast(sub, request.app.state.settings.fast_solve_seconds)),
+        **signals,  # flagged, canaries, leaks, fast: over every submission, not only the listed ones
+        "fast_s": fast_s,
         "confirm_word": RESET_ALL_CONFIRM,
     }
 
@@ -718,7 +710,7 @@ def admin_login(request: Request, password: str = Form("")):
     if wait is not None:
         activity.record(request, "admin_login_limited")
         return admin_login_page(request, slow_down_message(wait))
-    if not auth.check_admin_password(password[:MAX_ADMIN_PASSWORD], settings.admin_password):
+    if not auth.check_admin_password(password, settings.admin_password):
         activity.record(request, "admin_login_failed")
         return admin_login_page(request, "Wrong password.")
     activity.record(request, "admin_login")
@@ -734,14 +726,6 @@ def admin_logout(request: Request):
     resp = RedirectResponse("/admin", status_code=303)
     resp.delete_cookie(auth.ADMIN_COOKIE)
     return resp
-
-
-@app.post("/admin/indirect", dependencies=[Depends(admin_dep)])
-def admin_indirect(request: Request, unlock: str = Form(""), session: Session = Depends(get_session)):
-    on = unlock == "1"
-    activity.record(request, "admin_indirect_unlock" if on else "admin_indirect_lock")
-    set_flag(session, INDIRECT_UNLOCKED, "1" if on else "0")
-    return RedirectResponse(f"/admin?msg={'unlocked' if on else 'locked'}", status_code=303)
 
 
 @app.post("/admin/reset-all", dependencies=[Depends(admin_dep)])
