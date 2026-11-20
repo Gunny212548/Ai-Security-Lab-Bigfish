@@ -21,13 +21,11 @@ services:
     restart: unless-stopped
 
   caddy:
-    build: ./caddy            # Caddy + Porkbun DNS plugin (DNS-01: no inbound 80/443 needed)
+    image: caddy:2.10         # HTTPS with Caddy's own certificate (tls internal) + basic auth
     depends_on:
       - app
-    environment:              # read from .env; only these reach the Caddy container
+    environment:              # read from .env; only this reaches the Caddy container
       PUBLIC_PORT: ${PUBLIC_PORT:-8000}
-      PORKBUN_API_KEY: ${PORKBUN_API_KEY:-}
-      PORKBUN_API_SECRET_KEY: ${PORKBUN_API_SECRET_KEY:-}
     ports:                    # router: forward the same external port to this server
       - "${PUBLIC_PORT:-8000}:${PUBLIC_PORT:-8000}"
       - "${PUBLIC_PORT:-8000}:${PUBLIC_PORT:-8000}/udp"

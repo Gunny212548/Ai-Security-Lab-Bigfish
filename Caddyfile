@@ -1,13 +1,12 @@
-# Players open https://lab.bigfishai.lat:<PUBLIC_PORT>. The ISP blocks inbound 80/443, so the
-# certificate comes from a DNS-01 challenge through the Porkbun API (keys in .env).
+{
+	auto_https disable_redirects # only PUBLIC_PORT is mapped; no HTTP->HTTPS redirect on :80
+}
+
+# Players open https://lab.bigfishai.lat:<PUBLIC_PORT>. The ISP blocks inbound 80/443, so Let's Encrypt
+# cannot issue a certificate: Caddy signs its own (tls internal). Browsers warn once; players click
+# Advanced > Proceed.
 lab.bigfishai.lat:{$PUBLIC_PORT:8000} {
-	tls {
-		dns porkbun {
-			api_key {env.PORKBUN_API_KEY}
-			api_secret_key {env.PORKBUN_API_SECRET_KEY}
-		}
-		resolvers 1.1.1.1 1.0.0.1
-	}
+	tls internal
 	basic_auth {
 		admin $2a$14$rx7TUyRX9iS0/eRiewDUjelbfF3J9vzqMW1uhzD4KSlNNBa5p7agW
 	}
