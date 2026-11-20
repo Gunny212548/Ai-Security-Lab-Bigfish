@@ -1,6 +1,6 @@
 # Players open https://lab.bigfishai.lat:<PUBLIC_PORT>. The ISP blocks inbound 80/443, so the
 # certificate comes from a DNS-01 challenge through the Porkbun API (keys in .env).
-lab.bigfishai.lat:{$PUBLIC_PORT:443} {
+lab.bigfishai.lat:{$PUBLIC_PORT:8000} {
 	tls {
 		dns porkbun {
 			api_key {env.PORKBUN_API_KEY}

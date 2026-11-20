@@ -56,10 +56,10 @@ The admin page shows a warning while `APP_SECRET` or `ADMIN_PASSWORD` is still `
 docker compose up -d --build
 docker compose exec app python scripts/prewarm.py      # must print "All providers answered."
 ```
-Open http://localhost:8000 on the server itself. Players use https://lab.bigfishai.lat:`PUBLIC_PORT`: Caddy
+Open http://localhost:8001 on the server itself. Players use https://lab.bigfishai.lat:`PUBLIC_PORT`: Caddy
 (`Caddyfile`, built from `caddy/`) gets the TLS certificate, asks for the basic-auth login, then proxies to the
-app. Port 8000 is bound to 127.0.0.1 only, so nobody can skip the login. The ISP blocks inbound 80/443, so the
-certificate comes from a DNS-01 challenge through the Porkbun API: set `PUBLIC_PORT`, `PORKBUN_API_KEY` and
+app. The app's own port is bound to 127.0.0.1:8001 only, so nobody can skip the login. The ISP blocks inbound 80/443, so the
+certificate comes from a DNS-01 challenge through the Porkbun API: set `PUBLIC_PORT` (default 8000), `PORKBUN_API_KEY` and
 `PORKBUN_API_SECRET_KEY` in `.env`, turn on API Access for the domain in Porkbun, and forward the same port number
 from the router to the server. The DNS A record must point at the router's public IP. Check with
 `docker compose logs caddy` ("certificate obtained successfully"). New password:
