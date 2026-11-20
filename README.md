@@ -57,12 +57,11 @@ docker compose up -d --build
 docker compose exec app python scripts/prewarm.py      # must print "All providers answered."
 ```
 Open http://localhost:8001 on the server itself. Players use https://lab.bigfishai.lat:`PUBLIC_PORT` (default
-8000): Caddy (`Caddyfile`) serves HTTPS, asks for the basic-auth login, then proxies to the app. The app's own port
-is bound to 127.0.0.1:8001 only, so nobody can skip the login. The ISP blocks inbound 80/443, so Let's Encrypt
+8000): Caddy (`Caddyfile`) serves HTTPS and proxies to the app; there is no extra login in front of it. The app's own port
+is bound to 127.0.0.1:8001 only. The ISP blocks inbound 80/443, so Let's Encrypt
 cannot issue a certificate: Caddy signs its own (`tls internal`), and each browser shows a warning once (Advanced >
 Proceed). Forward the same port number from the router to the server; the DNS A record must point at the router's
-public IP. New password:
-`docker compose exec caddy caddy hash-password`, paste the hash into `Caddyfile`, then `docker compose restart caddy`. All 9 challenges were calibrated on Groq `openai/gpt-oss-120b` (see §3).
+public IP. Close the router port forward after the workshop. All 9 challenges were calibrated on Groq `openai/gpt-oss-120b` (see §3).
 
 **Capacity:** Groq's free tier allows about 8K tokens/min and 200K tokens/day for this model, roughly 130–200 chat
 turns per day across all teams. That is not enough for a full workshop: use the paid Dev Tier on the day.
@@ -154,7 +153,7 @@ Move a file back into `challenges/` to re-enable it, then calibrate.
 - [ ] `/admin` → **Reset all** (type `RESET`) to remove test teams. Teams created before
       per-team flags (or before an `APP_SECRET` change) hold old flags in their data, so reset them
 - [ ] Run `prewarm.py` again
-- [ ] Open https://lab.bigfishai.lat:<PUBLIC_PORT> from a phone on the guest Wi-Fi (login prompt, then the app); give players the basic-auth login
+- [ ] Open https://lab.bigfishai.lat:<PUBLIC_PORT> from a phone on the guest Wi-Fi (certificate warning, then the app)
 - [ ] Projector: open `/scoreboard`. Organizer laptop: open `/admin`. Keep the Solutions panels collapsed on screen
 
 **During**

@@ -7,8 +7,5 @@
 # Advanced > Proceed.
 lab.bigfishai.lat:{$PUBLIC_PORT:8000} {
 	tls internal
-	basic_auth {
-		admin $2a$14$rx7TUyRX9iS0/eRiewDUjelbfF3J9vzqMW1uhzD4KSlNNBa5p7agW
-	}
 	reverse_proxy app:8000
 }
